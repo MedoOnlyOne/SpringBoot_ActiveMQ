@@ -3,7 +3,6 @@ package com.example.artemisconsumer;
 import com.example.artemisconsumer.models.*;
 import com.example.artemisconsumer.repositpries.ApiAuditEntityRepository;
 import com.example.artemisconsumer.repositpries.ApiDumpEntityRepository;
-import com.example.artemisconsumer.repositpries.EaiDumpRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -11,14 +10,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jms.annotation.JmsListener;
 import org.springframework.stereotype.Component;
 
+import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 @Component
 public class ArtemisConsumer {
-    @Autowired
-    EaiDumpRepository eaiDumpRepository;
-
     @Autowired
     ApiAuditEntityRepository apiAuditEntityRepository;
 
@@ -27,30 +25,16 @@ public class ArtemisConsumer {
 
     @JmsListener(destination = "${jms.queue.destination}")
     public void receiveEiarDump(String msg) throws JsonProcessingException {
+        Timestamp t1 = new Timestamp(new Date().getTime());
         ObjectMapper mapper = new ObjectMapper();
-        DumpMsg dumpMsg = mapper.readValue(msg, DumpMsg.class);
-        System.out.println("Got Message: " + dumpMsg.toString());
-        System.out.println(dumpMsg.getMsgRqHdr().getMsg().getRqID());
+        APILogEntry dumpAuditMsg = mapper.readValue(msg, APILogEntry.class);
+        System.out.println("Got Message: " + dumpAuditMsg.toString());
+        Timestamp t2 = new Timestamp(new Date().getTime());
 
-        EaiDumpEntity dump = new EaiDumpEntity();
-        dump.setMdRequestId(dumpMsg.getMsgRqHdr().getMsg().getRqID());
-        dump.setMdCreationTmstmp(dumpMsg.getTmstmp());
-        dump.setMdSvcPrvdrId(dumpMsg.getSvcPrvdrID());
-        dump.setMdFlowId(dumpMsg.getFlowId());
-        dump.setMdMsgTp(dumpMsg.getDumpMsgType());
-        dump.setMdMsgData(dumpMsg.getEAIMsg());
-        System.out.println(dump.toString());
+        ApiAuditMsg auditMsg = new ApiAuditMsg(dumpAuditMsg.getReqID(), dumpAuditMsg.getAuditRecord(), dumpAuditMsg.getJson(), dumpAuditMsg.getText());
+        ApiDumpMsg dumpMsg = new ApiDumpMsg(dumpAuditMsg.getReqID(), dumpAuditMsg.getDumpRecords(), dumpAuditMsg.getJson(), dumpAuditMsg.getText());
 
-        eaiDumpRepository.save(dump);
-
-    }
-
-    @JmsListener(destination = "${jms.queue.destination.dump}")
-    public void receiveApiDump(String msg) throws JsonProcessingException {
-        ObjectMapper mapper = new ObjectMapper();
-        ApiDumpMsg dumpMsg = mapper.readValue(msg, ApiDumpMsg.class);
-        System.out.println("Got Dump Message: " + dumpMsg.toString());
-
+        // Dump
         List<ApiDumpEntity> apiDumpEntityList = new ArrayList<>();
 
         for (Msgs recordMsg: dumpMsg.getDumpRecords().getMsgs()){
@@ -72,17 +56,10 @@ public class ArtemisConsumer {
 
             apiDumpEntityList.add(apiDumpEntity);
         }
-
+        Timestamp t3 = new Timestamp(new Date().getTime());
         apiDumpEntityRepository.saveAll(apiDumpEntityList);
-    }
 
-    @JmsListener(destination = "${jms.queue.destination.audit}")
-    public void receiveApiAudit(String msg) throws JsonProcessingException {
-        ObjectMapper mapper = new ObjectMapper();
-        ApiAuditMsg auditMsg = mapper.readValue(msg, ApiAuditMsg.class);
-        System.out.println("Got Audit Message: " + auditMsg.toString());
-
-
+        // Audit
         ApiAuditEntity apiAuditEntity = new ApiAuditEntity(
                 null,
                 auditMsg.getReqID(),
@@ -125,5 +102,10 @@ public class ArtemisConsumer {
         );
 
         apiAuditEntityRepository.save(apiAuditEntity);
+         Timestamp t4 = new Timestamp(new Date().getTime());
+        System.out.println(t1);
+        System.out.println(t2);
+        System.out.println(t3);
+        System.out.println(t4);
     }
 }
