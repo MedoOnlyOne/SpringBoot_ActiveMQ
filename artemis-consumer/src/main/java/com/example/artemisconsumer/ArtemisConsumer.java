@@ -109,7 +109,7 @@ public class ArtemisConsumer  {
         System.out.println("Before calling thread" +new Timestamp(new Date().getTime()));
         RunnableObject taskThread=new RunnableObject(apiAuditEntityRepository,apiAuditEntity ,
         		apiDumpEntityRepository , apiDumpEntityList);
-		executor.submit(taskThread);
+		executor.execute(taskThread);
 		System.out.println("After calling thread" +new Timestamp(new Date().getTime()));
 
         System.out.println("start reading "+ t1);
