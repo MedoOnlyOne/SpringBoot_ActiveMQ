@@ -11,9 +11,7 @@ import org.springframework.stereotype.Component;
 import com.example.artemisconsumer.models.ApiAuditEntity;
 import com.example.artemisconsumer.models.ApiDumpEntity;
 import com.example.artemisconsumer.repositpries.ApiAuditEntityRepository;
-import com.example.artemisconsumer.repositpries.ApiAuditRepository;
 import com.example.artemisconsumer.repositpries.ApiDumpEntityRepository;
-import com.example.artemisconsumer.repositpries.ApiDumpRepository;
 
 @Component
 public class RunnableObject implements Runnable {

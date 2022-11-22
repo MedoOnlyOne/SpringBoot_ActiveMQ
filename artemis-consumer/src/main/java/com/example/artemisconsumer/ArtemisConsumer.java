@@ -3,8 +3,6 @@ package com.example.artemisconsumer;
 import com.example.artemisconsumer.models.*;
 import com.example.artemisconsumer.repositpries.ApiAuditEntityRepository;
 import com.example.artemisconsumer.repositpries.ApiDumpEntityRepository;
-import com.example.artemisconsumer.repositpries.ApiAuditRepository;
-import com.example.artemisconsumer.repositpries.ApiDumpRepository;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,7 +30,7 @@ public class ArtemisConsumer  {
     List<ApiAuditEntity> apiAuditEntityList = new ArrayList<>();
     List<ApiDumpEntity> apiDumpEntityList = new ArrayList<>();
     
-    private final int batch_size = 5;
+    private final int batch_size = 200;
     private final int MAX_THREADS = 5;
     private ExecutorService executor = Executors.newFixedThreadPool(MAX_THREADS);
     Timestamp t1 = new Timestamp(new Date().getTime());
