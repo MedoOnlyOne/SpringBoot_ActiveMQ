@@ -14,9 +14,11 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 @Component
-public class ArtemisConsumer {
+public class ArtemisConsumer  {
     @Autowired
     ApiAuditEntityRepository apiAuditEntityRepository;
 
@@ -29,7 +31,11 @@ public class ArtemisConsumer {
         ObjectMapper mapper = new ObjectMapper();
         APILogEntry dumpAuditMsg = mapper.readValue(msg, APILogEntry.class);
         System.out.println("Got Message: " + dumpAuditMsg.toString());
-        Timestamp t2 = new Timestamp(new Date().getTime());
+        
+      
+        
+        
+       // Timestamp t2 = new Timestamp(new Date().getTime());
 
         ApiAuditMsg auditMsg = new ApiAuditMsg(dumpAuditMsg.getReqID(), dumpAuditMsg.getAuditRecord(), dumpAuditMsg.getJson(), dumpAuditMsg.getText());
         ApiDumpMsg dumpMsg = new ApiDumpMsg(dumpAuditMsg.getReqID(), dumpAuditMsg.getDumpRecords(), dumpAuditMsg.getJson(), dumpAuditMsg.getText());
@@ -57,7 +63,7 @@ public class ArtemisConsumer {
             apiDumpEntityList.add(apiDumpEntity);
         }
         Timestamp t3 = new Timestamp(new Date().getTime());
-        apiDumpEntityRepository.saveAll(apiDumpEntityList);
+        //apiDumpEntityRepository.saveAll(apiDumpEntityList);
 
         // Audit
         ApiAuditEntity apiAuditEntity = new ApiAuditEntity(
@@ -101,11 +107,22 @@ public class ArtemisConsumer {
                 auditMsg.getAuditRecord().getAuditVars().getUsrDef15()
         );
 
-        apiAuditEntityRepository.save(apiAuditEntity);
+       Executor executor = Executors.newSingleThreadExecutor();
+        RunnableObject taskThread=new RunnableObject(apiAuditEntityRepository,apiAuditEntity , 
+        		apiDumpEntityRepository , apiDumpEntityList);
+//        RunnableObject taskThread=new RunnableObject(apiAuditEntity , 
+//        		 apiDumpEntityList);
+      // Executor executor = Executors.newSingleThreadExecutor();
+	//	RunnableObject runnableread = new RunnableObject("threadRead");
+		//RunnableObject runnableinsert = new RunnableObject("threadinsert");
+		executor.execute(taskThread);  
+		System.out.println("After calling thread" +new Timestamp(new Date().getTime()) );
+       // apiAuditEntityRepository.save(apiAuditEntity);
          Timestamp t4 = new Timestamp(new Date().getTime());
-        System.out.println(t1);
-        System.out.println(t2);
-        System.out.println(t3);
-        System.out.println(t4);
+        System.out.println("start reading "+ t1);
+     //    System.out.println(t2);
+       // System.out.println(t3);
+        System.out.println("end reading" +  t4);
     }
+    
 }

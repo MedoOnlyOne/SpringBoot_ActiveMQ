@@ -88,6 +88,7 @@ public class ApiAuditEntity {
     @Column(name = "a_usr_dfn_15")
     private String aUsrDfn15;
 
+    public ApiAuditEntity() {}
     public ApiAuditEntity(String aMsgId, String aReqId, String aApiName, String aApiVersion, String aApiTp, String aHttpMethod, String aProtocol, String aApiRoot, String aOperationId, String aApiPath, String aCatalogueId, String aCatalogueName, String aClientOrgId, String aClientOrgName, String aClientAppId, String aClientAppName, Timestamp aTmstmp1, Timestamp aTmstmp2, Timestamp aTmstmp3, Timestamp aTmstmp4, String aTmstmpX, String aRjctnRsn, String aHttpStatusCode, String aUsrDfn1, String aUsrDfn2, String aUsrDfn3, String aUsrDfn4, String aUsrDfn5, String aUsrDfn6, String aUsrDfn7, String aUsrDfn8, String aUsrDfn9, String aUsrDfn10, String aUsrDfn11, String aUsrDfn12, String aUsrDfn13, String aUsrDfn14, String aUsrDfn15) {
         this.aMsgId = aMsgId;
         this.aReqId = aReqId;
