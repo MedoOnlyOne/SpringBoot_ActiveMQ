@@ -11,48 +11,46 @@ import org.springframework.stereotype.Component;
 import com.example.artemisconsumer.models.ApiAuditEntity;
 import com.example.artemisconsumer.models.ApiDumpEntity;
 import com.example.artemisconsumer.repositpries.ApiAuditEntityRepository;
+import com.example.artemisconsumer.repositpries.ApiAuditRepository;
 import com.example.artemisconsumer.repositpries.ApiDumpEntityRepository;
+import com.example.artemisconsumer.repositpries.ApiDumpRepository;
 
 @Component
 public class RunnableObject implements Runnable {
 	
 	@Autowired
-	private ApiAuditEntityRepository apiAuditEntityRepository;
+	private ApiAuditEntityRepository APIAuditEntityRepository;
+	
 	@Autowired
-	private ApiDumpEntityRepository  apiDumpEntityRepository;
+	private ApiDumpEntityRepository  APIDumpEntityRepository;
 	
 	private List<ApiDumpEntity> apiDumpEntityList ;
-	private ApiAuditEntity apiAuditEntity;
-
+	private List<ApiAuditEntity> ApiAuditEntityList ;
+	
+	
 	public RunnableObject() {}
 	public RunnableObject(
-			ApiAuditEntityRepository apiAuditEntityRepository ,
-			ApiAuditEntity apiAuditEntity,
-			ApiDumpEntityRepository  apiDumpEntityRepository ,
-			List<ApiDumpEntity> apiDumpEntityList) {
-		this.apiDumpEntityRepository =  apiDumpEntityRepository;
-		this.apiAuditEntityRepository = apiAuditEntityRepository;
-		this.apiAuditEntity = apiAuditEntity;
-		this.apiDumpEntityList = new ArrayList<>(apiDumpEntityList);
+			ApiAuditEntityRepository APIAuditEntityRepository ,
+			ApiDumpEntityRepository  APIDumpEntityRepository , 
+			List<ApiDumpEntity> apiDumpEntityList, 
+			List<ApiAuditEntity> ApiAuditEntityList
+			)
+	{
+		this.APIDumpEntityRepository =  APIDumpEntityRepository;
+		this.APIAuditEntityRepository = APIAuditEntityRepository;
+		this.apiDumpEntityList = new ArrayList<>(apiDumpEntityList) ;
+		this.ApiAuditEntityList = new ArrayList<>(ApiAuditEntityList); 
 	}
-
-//	public RunnableObject(ApiAuditEntity apiAuditEntity, List<ApiDumpEntity> apiDumpEntityList) {
-//		this.apiAuditEntity = apiAuditEntity;
-//		this.apiDumpEntityList = new ArrayList<>(apiDumpEntityList);
-//	}
+	
 
 	@Override
 	public void run() {
-		System.out.println("Started thread");
-
-		// Save Audit message & dump
+		// Save Audit message & dump 
 		Timestamp t1 = new Timestamp(new Date().getTime());
-		apiAuditEntityRepository.save(apiAuditEntity);
-		apiDumpEntityRepository.saveAll(apiDumpEntityList);
+		APIAuditEntityRepository.saveAll(ApiAuditEntityList);
+		APIDumpEntityRepository.saveAll(apiDumpEntityList);		
 		Timestamp t2 = new Timestamp(new Date().getTime());
-
-		System.out.println("time before insertion "+t1);
-		System.out.println("time after insertion "+t2);
-		System.out.println("Ended thread");
+		 System.out.println("time before insertion "+t1);
+		 System.out.println("time after insertion "+t2);
 	}
 }

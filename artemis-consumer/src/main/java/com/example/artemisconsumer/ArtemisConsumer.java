@@ -3,6 +3,9 @@ package com.example.artemisconsumer;
 import com.example.artemisconsumer.models.*;
 import com.example.artemisconsumer.repositpries.ApiAuditEntityRepository;
 import com.example.artemisconsumer.repositpries.ApiDumpEntityRepository;
+import com.example.artemisconsumer.repositpries.ApiAuditRepository;
+import com.example.artemisconsumer.repositpries.ApiDumpRepository;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -24,24 +27,25 @@ public class ArtemisConsumer  {
 
     @Autowired
     ApiDumpEntityRepository apiDumpEntityRepository;
-
+    
+    
+    List<ApiAuditEntity> apiAuditEntityList = new ArrayList<>();
+    List<ApiDumpEntity> apiDumpEntityList = new ArrayList<>();
+    
+    private final int batch_size = 5;
     private final int MAX_THREADS = 5;
     private ExecutorService executor = Executors.newFixedThreadPool(MAX_THREADS);
-
+    Timestamp t1 = new Timestamp(new Date().getTime());
+    
     @JmsListener(destination = "${jms.queue.destination}")
-    public void receive(String msg) throws JsonProcessingException {
-        // Map string message to APILogEntry Object
-        Timestamp t1 = new Timestamp(new Date().getTime());
+    public void receiveEiarDump(String msg) throws JsonProcessingException {
+        
         ObjectMapper mapper = new ObjectMapper();
         APILogEntry dumpAuditMsg = mapper.readValue(msg, APILogEntry.class);
-        System.out.println("Got Message: " + dumpAuditMsg.toString());
-
-        // Separate Audit, and Dump messages
+        System.out.println("Got Message: " + dumpAuditMsg.toString());        
         ApiAuditMsg auditMsg = new ApiAuditMsg(dumpAuditMsg.getReqID(), dumpAuditMsg.getAuditRecord(), dumpAuditMsg.getJson(), dumpAuditMsg.getText());
-        ApiDumpMsg dumpMsg = new ApiDumpMsg(dumpAuditMsg.getReqID(), dumpAuditMsg.getDumpRecords(), dumpAuditMsg.getJson(), dumpAuditMsg.getText());
+        ApiDumpMsg dumpMsg = new ApiDumpMsg(dumpAuditMsg.getReqID(), dumpAuditMsg.getDumpRecords(), dumpAuditMsg.getJson(), dumpAuditMsg.getText());      
 
-        // Generate Dump Entries
-        List<ApiDumpEntity> apiDumpEntityList = new ArrayList<>();
         for (Msgs recordMsg: dumpMsg.getDumpRecords().getMsgs()){
             ApiDumpEntity apiDumpEntity = new ApiDumpEntity(
                     null,
@@ -61,8 +65,9 @@ public class ArtemisConsumer  {
 
             apiDumpEntityList.add(apiDumpEntity);
         }
+      
 
-        // Generate Audit Entry
+        // Audit
         ApiAuditEntity apiAuditEntity = new ApiAuditEntity(
                 null,
                 auditMsg.getReqID(),
@@ -103,17 +108,26 @@ public class ArtemisConsumer  {
                 auditMsg.getAuditRecord().getAuditVars().getUsrDef14(),
                 auditMsg.getAuditRecord().getAuditVars().getUsrDef15()
         );
-
-        Timestamp t2 = new Timestamp(new Date().getTime());
-
-        System.out.println("Before calling thread" +new Timestamp(new Date().getTime()));
-        RunnableObject taskThread=new RunnableObject(apiAuditEntityRepository,apiAuditEntity ,
-        		apiDumpEntityRepository , apiDumpEntityList);
-		executor.execute(taskThread);
-		System.out.println("After calling thread" +new Timestamp(new Date().getTime()));
-
-        System.out.println("start reading "+ t1);
-        System.out.println("end reading" +  t2);
+        apiAuditEntityList.add(apiAuditEntity);
+  
+        if (apiAuditEntityList.size() == batch_size) { 
+        	
+        	Timestamp t2 = new Timestamp(new Date().getTime());
+            System.out.println("start reading "+ t1);
+            System.out.println("end reading" +  t2);
+            
+        	 RunnableObject taskThread=new RunnableObject(apiAuditEntityRepository,
+        			 apiDumpEntityRepository,
+        			 apiDumpEntityList ,
+        			 apiAuditEntityList  
+             		  );              
+             executor.execute(taskThread); 
+     		System.out.println("After calling thread" +new Timestamp(new Date().getTime()) );
+     		apiAuditEntityList.clear();
+     		apiDumpEntityList.clear();
+     		t1 = new Timestamp(new Date().getTime());
+     		
+        }
     }
     
 }
