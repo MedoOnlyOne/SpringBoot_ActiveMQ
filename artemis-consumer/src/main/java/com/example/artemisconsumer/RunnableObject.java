@@ -17,48 +17,42 @@ import com.example.artemisconsumer.repositpries.ApiDumpEntityRepository;
 public class RunnableObject implements Runnable {
 	
 	@Autowired
-	private ApiAuditEntityRepository APIAuditEntityRepository;
-	
+	private ApiAuditEntityRepository apiAuditEntityRepository;
 	@Autowired
-	private ApiDumpEntityRepository  APIDumpEntityRepository;
+	private ApiDumpEntityRepository  apiDumpEntityRepository;
 	
 	private List<ApiDumpEntity> apiDumpEntityList ;
-	private ApiAuditEntity ApiAuditEntity;
-	
+	private ApiAuditEntity apiAuditEntity;
+
 	public RunnableObject() {}
 	public RunnableObject(
-			ApiAuditEntityRepository APIAuditEntityRepository ,
-			ApiAuditEntity ApiAuditEntity, 
-			ApiDumpEntityRepository  APIDumpEntityRepository , 
-			List<ApiDumpEntity> apiDumpEntityList
-			)
-	{
-		this.APIDumpEntityRepository =  APIDumpEntityRepository;
-		this.APIAuditEntityRepository = APIAuditEntityRepository;
-		this.ApiAuditEntity = ApiAuditEntity ;
-		this.apiDumpEntityList = apiDumpEntityList;
+			ApiAuditEntityRepository apiAuditEntityRepository ,
+			ApiAuditEntity apiAuditEntity,
+			ApiDumpEntityRepository  apiDumpEntityRepository ,
+			List<ApiDumpEntity> apiDumpEntityList) {
+		this.apiDumpEntityRepository =  apiDumpEntityRepository;
+		this.apiAuditEntityRepository = apiAuditEntityRepository;
+		this.apiAuditEntity = apiAuditEntity;
+		this.apiDumpEntityList = new ArrayList<>(apiDumpEntityList);
 	}
-	String name;
-	
-	public RunnableObject(String name) {
-		this.name = name;
-	}
+
+//	public RunnableObject(ApiAuditEntity apiAuditEntity, List<ApiDumpEntity> apiDumpEntityList) {
+//		this.apiAuditEntity = apiAuditEntity;
+//		this.apiDumpEntityList = new ArrayList<>(apiDumpEntityList);
+//	}
 
 	@Override
 	public void run() {
-		System.out.println("Started thread " + name);
-		//save db
-          /* ApiAuditEntity ApiAuditEntity= APIAuditEntityRepository.findById(892).orElseThrow(
-			() ->  new IllegalStateException("Student with id " + 892 + " does not exist")
-			 );
-         System.out.print(ApiAuditEntity.getaApiName());*/
-		// Save Audit message & dump 
+		System.out.println("Started thread");
+
+		// Save Audit message & dump
 		Timestamp t1 = new Timestamp(new Date().getTime());
-		APIAuditEntityRepository.save(ApiAuditEntity);
-		APIDumpEntityRepository.saveAll(apiDumpEntityList);
+		apiAuditEntityRepository.save(apiAuditEntity);
+		apiDumpEntityRepository.saveAll(apiDumpEntityList);
 		Timestamp t2 = new Timestamp(new Date().getTime());
-		 System.out.println("time before insertion "+t1);
-		 System.out.println("time after insertion "+t2);
-		System.out.println("Ended thread " + name);
+
+		System.out.println("time before insertion "+t1);
+		System.out.println("time after insertion "+t2);
+		System.out.println("Ended thread");
 	}
 }

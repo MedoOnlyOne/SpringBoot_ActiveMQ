@@ -14,7 +14,7 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @Component
@@ -25,24 +25,23 @@ public class ArtemisConsumer  {
     @Autowired
     ApiDumpEntityRepository apiDumpEntityRepository;
 
+    private final int MAX_THREADS = 5;
+    private ExecutorService executor = Executors.newFixedThreadPool(MAX_THREADS);
+
     @JmsListener(destination = "${jms.queue.destination}")
-    public void receiveEiarDump(String msg) throws JsonProcessingException {
+    public void receive(String msg) throws JsonProcessingException {
+        // Map string message to APILogEntry Object
         Timestamp t1 = new Timestamp(new Date().getTime());
         ObjectMapper mapper = new ObjectMapper();
         APILogEntry dumpAuditMsg = mapper.readValue(msg, APILogEntry.class);
         System.out.println("Got Message: " + dumpAuditMsg.toString());
-        
-      
-        
-        
-       // Timestamp t2 = new Timestamp(new Date().getTime());
 
+        // Separate Audit, and Dump messages
         ApiAuditMsg auditMsg = new ApiAuditMsg(dumpAuditMsg.getReqID(), dumpAuditMsg.getAuditRecord(), dumpAuditMsg.getJson(), dumpAuditMsg.getText());
         ApiDumpMsg dumpMsg = new ApiDumpMsg(dumpAuditMsg.getReqID(), dumpAuditMsg.getDumpRecords(), dumpAuditMsg.getJson(), dumpAuditMsg.getText());
 
-        // Dump
+        // Generate Dump Entries
         List<ApiDumpEntity> apiDumpEntityList = new ArrayList<>();
-
         for (Msgs recordMsg: dumpMsg.getDumpRecords().getMsgs()){
             ApiDumpEntity apiDumpEntity = new ApiDumpEntity(
                     null,
@@ -62,10 +61,8 @@ public class ArtemisConsumer  {
 
             apiDumpEntityList.add(apiDumpEntity);
         }
-        Timestamp t3 = new Timestamp(new Date().getTime());
-        //apiDumpEntityRepository.saveAll(apiDumpEntityList);
 
-        // Audit
+        // Generate Audit Entry
         ApiAuditEntity apiAuditEntity = new ApiAuditEntity(
                 null,
                 auditMsg.getReqID(),
@@ -107,22 +104,16 @@ public class ArtemisConsumer  {
                 auditMsg.getAuditRecord().getAuditVars().getUsrDef15()
         );
 
-       Executor executor = Executors.newSingleThreadExecutor();
-        RunnableObject taskThread=new RunnableObject(apiAuditEntityRepository,apiAuditEntity , 
+        Timestamp t2 = new Timestamp(new Date().getTime());
+
+        System.out.println("Before calling thread" +new Timestamp(new Date().getTime()));
+        RunnableObject taskThread=new RunnableObject(apiAuditEntityRepository,apiAuditEntity ,
         		apiDumpEntityRepository , apiDumpEntityList);
-//        RunnableObject taskThread=new RunnableObject(apiAuditEntity , 
-//        		 apiDumpEntityList);
-      // Executor executor = Executors.newSingleThreadExecutor();
-	//	RunnableObject runnableread = new RunnableObject("threadRead");
-		//RunnableObject runnableinsert = new RunnableObject("threadinsert");
-		executor.execute(taskThread);  
-		System.out.println("After calling thread" +new Timestamp(new Date().getTime()) );
-       // apiAuditEntityRepository.save(apiAuditEntity);
-         Timestamp t4 = new Timestamp(new Date().getTime());
+		executor.submit(taskThread);
+		System.out.println("After calling thread" +new Timestamp(new Date().getTime()));
+
         System.out.println("start reading "+ t1);
-     //    System.out.println(t2);
-       // System.out.println(t3);
-        System.out.println("end reading" +  t4);
+        System.out.println("end reading" +  t2);
     }
     
 }
