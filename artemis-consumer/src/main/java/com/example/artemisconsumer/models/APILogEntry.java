@@ -5,7 +5,7 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 import java.io.Serializable;
 
 @JacksonXmlRootElement(localName = "APILogEntry")
-public class APILogEntry implements Serializable {
+public class APILogEntry {
      @JacksonXmlProperty(isAttribute = true)
      String ReqID;
      @JacksonXmlProperty(isAttribute = true)
