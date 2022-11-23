@@ -2,8 +2,11 @@ package com.example.artemisconsumer;
 
 import com.example.artemisconsumer.models.*;
 import com.example.artemisconsumer.repositpries.ApiAuditEntityRepository;
+import com.example.artemisconsumer.repositpries.ApiAuditRepository;
 import com.example.artemisconsumer.repositpries.ApiDumpEntityRepository;
 
+import com.example.artemisconsumer.repositpries.ApiDumpRepository;
+import com.example.artemisconsumer.services.Insert;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -21,29 +24,39 @@ import java.util.concurrent.Executors;
 @Component
 public class ArtemisConsumer  {
     @Autowired
-    ApiAuditEntityRepository apiAuditEntityRepository;
+    private ApiDumpRepository apiDumpRepository;
+    @Autowired
+    private ApiAuditRepository apiAuditRepository;
 
     @Autowired
-    ApiDumpEntityRepository apiDumpEntityRepository;
+    private Insert insert;
+
+    private static List<ApiAuditEntity> apiAuditEntityList = new ArrayList<>();
+    private static List<ApiDumpEntity> apiDumpEntityList = new ArrayList<>();
     
-    
-    List<ApiAuditEntity> apiAuditEntityList = new ArrayList<>();
-    List<ApiDumpEntity> apiDumpEntityList = new ArrayList<>();
-    
-    private final int batch_size = 200;
-    private final int MAX_THREADS = 5;
+    private final int batch_size = 500;
+    private final int MAX_THREADS = 3;
     private ExecutorService executor = Executors.newFixedThreadPool(MAX_THREADS);
-    Timestamp t1 = new Timestamp(new Date().getTime());
-    
+    private static Timestamp t1, t2;
+    private static boolean IsInserted;
+
+    static {
+        ArtemisConsumer.t1 = new Timestamp(new Date().getTime());
+        ArtemisConsumer.IsInserted = true;
+    }
     @JmsListener(destination = "${jms.queue.destination}")
     public void receiveEiarDump(String msg) throws JsonProcessingException {
-        
+        if(ArtemisConsumer.apiAuditEntityList.size() == 0){
+            ArtemisConsumer.t1 = new Timestamp(new Date().getTime());
+            ArtemisConsumer.IsInserted = false;
+        }
+
         ObjectMapper mapper = new ObjectMapper();
         APILogEntry dumpAuditMsg = mapper.readValue(msg, APILogEntry.class);
-        System.out.println("Got Message: " + dumpAuditMsg.toString());        
         ApiAuditMsg auditMsg = new ApiAuditMsg(dumpAuditMsg.getReqID(), dumpAuditMsg.getAuditRecord(), dumpAuditMsg.getJson(), dumpAuditMsg.getText());
         ApiDumpMsg dumpMsg = new ApiDumpMsg(dumpAuditMsg.getReqID(), dumpAuditMsg.getDumpRecords(), dumpAuditMsg.getJson(), dumpAuditMsg.getText());      
 
+        // Dump
         for (Msgs recordMsg: dumpMsg.getDumpRecords().getMsgs()){
             ApiDumpEntity apiDumpEntity = new ApiDumpEntity(
                     null,
@@ -60,10 +73,8 @@ public class ArtemisConsumer  {
                     recordMsg.getTmstmp(),
                     recordMsg.getProviderName()
             );
-
-            apiDumpEntityList.add(apiDumpEntity);
+            ArtemisConsumer.apiDumpEntityList.add(apiDumpEntity);
         }
-      
 
         // Audit
         ApiAuditEntity apiAuditEntity = new ApiAuditEntity(
@@ -106,26 +117,65 @@ public class ArtemisConsumer  {
                 auditMsg.getAuditRecord().getAuditVars().getUsrDef14(),
                 auditMsg.getAuditRecord().getAuditVars().getUsrDef15()
         );
-        apiAuditEntityList.add(apiAuditEntity);
+        ArtemisConsumer.apiAuditEntityList.add(apiAuditEntity);
   
-        if (apiAuditEntityList.size() == batch_size) { 
-        	
-        	Timestamp t2 = new Timestamp(new Date().getTime());
+        if (ArtemisConsumer.apiAuditEntityList.size() == batch_size) {
+            ArtemisConsumer.t2 = new Timestamp(new Date().getTime());
             System.out.println("start reading "+ t1);
-            System.out.println("end reading" +  t2);
+            System.out.println("end reading " +  t2);
+            System.out.println("Read " + batch_size + " messages in " + (t2.getTime() - t1.getTime())/1000.0 + " s");
             
-        	 RunnableObject taskThread=new RunnableObject(apiAuditEntityRepository,
-        			 apiDumpEntityRepository,
-        			 apiDumpEntityList ,
-        			 apiAuditEntityList  
-             		  );              
-             executor.execute(taskThread); 
-     		System.out.println("After calling thread" +new Timestamp(new Date().getTime()) );
-     		apiAuditEntityList.clear();
-     		apiDumpEntityList.clear();
-     		t1 = new Timestamp(new Date().getTime());
-     		
+        	RunnableObject taskThread=new RunnableObject(insert,
+                     apiDumpRepository,
+                     apiAuditRepository,
+                     ArtemisConsumer.apiDumpEntityList ,
+                     ArtemisConsumer.apiAuditEntityList
+             		  );
+            executor.execute(taskThread);
+            ArtemisConsumer.apiAuditEntityList.clear();
+            ArtemisConsumer.apiDumpEntityList.clear();
+            ArtemisConsumer.IsInserted = true;
+            ArtemisConsumer.t1 = new Timestamp(new Date().getTime());
         }
     }
-    
+
+    public static boolean isInsert() {
+        return ArtemisConsumer.IsInserted;
+    }
+
+    public static void setInsert(boolean insert) {
+        ArtemisConsumer.IsInserted = insert;
+    }
+
+    public static Timestamp getT1() {
+        return ArtemisConsumer.t1;
+    }
+
+    public static void setT1(Timestamp t1) {
+        ArtemisConsumer.t1 = t1;
+    }
+
+    public static Timestamp getT2() {
+        return ArtemisConsumer.t2;
+    }
+
+    public static void setT2(Timestamp t2) {
+        ArtemisConsumer.t2 = t2;
+    }
+
+    public static List<ApiAuditEntity> getApiAuditEntityList() {
+        return ArtemisConsumer.apiAuditEntityList;
+    }
+
+    public static void setApiAuditEntityList(List<ApiAuditEntity> apiAuditEntityList) {
+        ArtemisConsumer.apiAuditEntityList = apiAuditEntityList;
+    }
+
+    public static List<ApiDumpEntity> getApiDumpEntityList() {
+        return ArtemisConsumer.apiDumpEntityList;
+    }
+
+    public static void setApiDumpEntityList(List<ApiDumpEntity> apiDumpEntityList) {
+        ArtemisConsumer.apiDumpEntityList = apiDumpEntityList;
+    }
 }
