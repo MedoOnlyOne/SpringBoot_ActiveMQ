@@ -1,19 +1,18 @@
 package com.example.artemisconsumer;
 
 import com.example.artemisconsumer.models.*;
-import com.example.artemisconsumer.repositpries.ApiAuditEntityRepository;
 import com.example.artemisconsumer.repositpries.ApiAuditRepository;
-import com.example.artemisconsumer.repositpries.ApiDumpEntityRepository;
-
 import com.example.artemisconsumer.repositpries.ApiDumpRepository;
 import com.example.artemisconsumer.services.Insert;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jms.annotation.JmsListener;
 import org.springframework.stereotype.Component;
-
+import org.xml.sax.SAXException;
+import javax.xml.bind.JAXBException;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.TransformerException;
+import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
@@ -45,16 +44,24 @@ public class ArtemisConsumer  {
         ArtemisConsumer.IsInserted = true;
     }
     @JmsListener(destination = "${jms.queue.destination}")
-    public void receiveEiarDump(String msg) throws JsonProcessingException {
+    public void receive(String msg) throws IOException, JAXBException, SAXException, ParserConfigurationException, TransformerException {
         if(ArtemisConsumer.apiAuditEntityList.size() == 0){
             ArtemisConsumer.t1 = new Timestamp(new Date().getTime());
             ArtemisConsumer.IsInserted = false;
         }
 
-        ObjectMapper mapper = new ObjectMapper();
-        APILogEntry dumpAuditMsg = mapper.readValue(msg, APILogEntry.class);
+//        ObjectMapper mapper = new ObjectMapper();
+//        APILogEntry dumpAuditMsg = mapper.readValue(msg, APILogEntry.class);
+
+//        System.out.println("################################### Got: " + msg + " ###############################################################");
+
+
+        XmlMapper xmlMapper = new XmlMapper();
+        APILogEntry dumpAuditMsg = xmlMapper.readValue(msg.getBytes(), APILogEntry.class);
+
+//        System.out.println("The message object" + dumpAuditMsg.toString());
         ApiAuditMsg auditMsg = new ApiAuditMsg(dumpAuditMsg.getReqID(), dumpAuditMsg.getAuditRecord(), dumpAuditMsg.getJson(), dumpAuditMsg.getText());
-        ApiDumpMsg dumpMsg = new ApiDumpMsg(dumpAuditMsg.getReqID(), dumpAuditMsg.getDumpRecords(), dumpAuditMsg.getJson(), dumpAuditMsg.getText());      
+        ApiDumpMsg dumpMsg = new ApiDumpMsg(dumpAuditMsg.getReqID(), dumpAuditMsg.getDumpRecords(), dumpAuditMsg.getJson(), dumpAuditMsg.getText());
 
         // Dump
         for (Msgs recordMsg: dumpMsg.getDumpRecords().getMsgs()){
@@ -124,7 +131,7 @@ public class ArtemisConsumer  {
             System.out.println("start reading "+ t1);
             System.out.println("end reading " +  t2);
             System.out.println("Read " + batch_size + " messages in " + (t2.getTime() - t1.getTime())/1000.0 + " s");
-            
+
         	RunnableObject taskThread=new RunnableObject(insert,
                      apiDumpRepository,
                      apiAuditRepository,

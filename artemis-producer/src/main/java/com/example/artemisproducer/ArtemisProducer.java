@@ -13,7 +13,11 @@ public class ArtemisProducer {
     @Value("${jms.queue.destination}")
     String destinationQueue;
 
-    public void send(APILogEntry msg) {
+    public void sendJsonString(APILogEntry msg) {
+        jmsTemplate.convertAndSend(destinationQueue, msg);
+    }
+
+    public void sendXMLStrimg(String msg) {
         jmsTemplate.convertAndSend(destinationQueue, msg);
     }
 }

@@ -11,11 +11,18 @@ public class RestApiController {
     @Autowired
     ArtemisProducer producer;
 
+//    @PostMapping(consumes = {MediaType.APPLICATION_XML_VALUE})
+//    public String produce(@RequestBody APILogEntry msg) {
+//        System.out.println(msg.toString());
+//        System.out.println(msg.getDumpRecords().getMsgs().size());
+//        producer.send(msg);
+//        return "Done";
+//    }
+
     @PostMapping(consumes = {MediaType.APPLICATION_XML_VALUE})
-    public String produce(@RequestBody APILogEntry msg) {
-        System.out.println(msg.toString());
-        System.out.println(msg.getDumpRecords().getMsgs().size());
-        producer.send(msg);
+    public String produce(@RequestBody String msg) {
+        System.out.println(msg);
+        producer.sendXMLStrimg(msg);
         return "Done";
     }
 }
