@@ -39,9 +39,11 @@ public class ArtemisConsumer  {
     @Autowired
     private Insert insert;
 
-    private static List<ApiAuditEntity> apiAuditEntityList = new ArrayList<>();
-    private static List<ApiDumpEntity> apiDumpEntityList = new ArrayList<>();
-    
+    private static List<List<ApiAuditEntity>> apiAuditEntityLists = new ArrayList<>(10);
+    private static List<List<ApiDumpEntity>> apiDumpEntityLists = new ArrayList<>(10);
+    private static List<Boolean> freeLists = new ArrayList<>(10);
+    private static int activeList;
+
     private final int batch_size = 500;
     private final int MAX_THREADS = 3;
     private ExecutorService executor = Executors.newFixedThreadPool(MAX_THREADS);
@@ -51,10 +53,17 @@ public class ArtemisConsumer  {
     static {
         ArtemisConsumer.t1 = new Timestamp(new Date().getTime());
         ArtemisConsumer.IsInserted = true;
+        for (int i = 0; i < 10; i++){
+            ArtemisConsumer.freeLists.add(i, true);
+            ArtemisConsumer.apiDumpEntityLists.add(i, new ArrayList<ApiDumpEntity>());
+            ArtemisConsumer.apiAuditEntityLists.add(i, new ArrayList<ApiAuditEntity>());
+        }
+        ArtemisConsumer.freeLists.set(0, false);
+        ArtemisConsumer.activeList = 0;
     }
     @JmsListener(destination = "${jms.queue.destination}")
     public void receiveEiarDump(String msg) throws IOException, JAXBException, SAXException, ParserConfigurationException, TransformerException {
-        if(ArtemisConsumer.apiAuditEntityList.size() == 0){
+        if(ArtemisConsumer.apiAuditEntityLists.get(activeList).size() == 0){
             ArtemisConsumer.t1 = new Timestamp(new Date().getTime());
             ArtemisConsumer.IsInserted = false;
         }
@@ -70,7 +79,7 @@ public class ArtemisConsumer  {
         String AuditEntity = "<Audit>" + ReqId + ApiDetails + AuditVars + "</Audit>";
       //Map Audit Entity
         ApiAuditEntity ApiAuditEntity = xmlMapper.readValue(AuditEntity.getBytes(), ApiAuditEntity.class);
-        ArtemisConsumer.apiAuditEntityList.add(ApiAuditEntity);
+        ArtemisConsumer.apiAuditEntityLists.get(activeList).add(ApiAuditEntity);
                
        //Map Dump Records 
         String [] DumpRecords = msg.split("<DumpRecords>")[1].split("</DumpRecords>")[0].split("<Msg>");
@@ -78,7 +87,7 @@ public class ArtemisConsumer  {
         for (int i = 1; i < DumpRecords.length; i++) {
         	String DumpRecord = "<Dump>" + ReqId + DumpRecords[i].split("</Msg>")[0] + "</Dump>";
             ApiDumpEntity ApiDumpEntity =  xmlMapper.readValue(DumpRecord.getBytes(), ApiDumpEntity.class);
-          ArtemisConsumer.apiDumpEntityList.add(ApiDumpEntity);
+          ArtemisConsumer.apiDumpEntityLists.get(activeList).add(ApiDumpEntity);
         }
         
         //APILogEntry dumpAuditMsg = xmlMapper.readValue(msg.getBytes(), APILogEntry.class);
@@ -88,13 +97,13 @@ public class ArtemisConsumer  {
         
 //        ApiDumpEntity ApiDumpEntity1 =  xmlMapper.readValue(DumpRecord1.getBytes(), ApiDumpEntity.class);
 ////        System.out.println("DumpEntityATTRIBUTE"+ApiAuditEntity1.getMdMsgTp());
-//        ArtemisConsumer.apiDumpEntityList.add(ApiDumpEntity1);
+//        ArtemisConsumer.apiDumpEntityLists.get(activeList).add(ApiDumpEntity1);
 //        
 //        ApiDumpEntity ApiDumpEntity2 =  xmlMapper.readValue(DumpRecord2.getBytes(), ApiDumpEntity.class);     
-//        ArtemisConsumer.apiDumpEntityList.add(ApiDumpEntity2);
+//        ArtemisConsumer.apiDumpEntityLists.get(activeList).add(ApiDumpEntity2);
 //        
 //        ApiDumpEntity ApiDumpEntity3 =  xmlMapper.readValue(DumpRecord3.getBytes(), ApiDumpEntity.class);     
-//        ArtemisConsumer.apiDumpEntityList.add(ApiDumpEntity3);
+//        ArtemisConsumer.apiDumpEntityLists.get(activeList).add(ApiDumpEntity3);
         
 //        ObjectMapper mapper = new ObjectMapper();
 //        APILogEntry dumpAuditMsg = mapper.readValue(msg , APILogEntry.class );
@@ -122,7 +131,7 @@ public class ArtemisConsumer  {
 //                    recordMsg.getTmstmp(),
 //                    recordMsg.getProviderName()
 //            );
-//            ArtemisConsumer.apiDumpEntityList.add(apiDumpEntity);
+//            ArtemisConsumer.apiDumpEntityLists.get(activeList).add(apiDumpEntity);
 //        }
 
         // Audit
@@ -168,7 +177,7 @@ public class ArtemisConsumer  {
 //        );
        
   
-        if (ArtemisConsumer.apiAuditEntityList.size() == batch_size) {
+        if (ArtemisConsumer.apiAuditEntityLists.get(activeList).size() == batch_size) {
             ArtemisConsumer.t2 = new Timestamp(new Date().getTime());
             System.out.println("start reading "+ t1);
             System.out.println("end reading " +  t2);
@@ -177,14 +186,31 @@ public class ArtemisConsumer  {
         	RunnableObject taskThread=new RunnableObject(insert,
                      apiDumpRepository,
                      apiAuditRepository,
-                     ArtemisConsumer.apiDumpEntityList ,
-                     ArtemisConsumer.apiAuditEntityList
+                     ArtemisConsumer.apiDumpEntityLists.get(activeList) ,
+                     ArtemisConsumer.apiAuditEntityLists.get(activeList),
+                    ArtemisConsumer.activeList
              		  );
             executor.execute(taskThread);
-            ArtemisConsumer.apiAuditEntityList.clear();
-            ArtemisConsumer.apiDumpEntityList.clear();
+//            ArtemisConsumer.apiAuditEntityList.clear();
+//            ArtemisConsumer.apiDumpEntityList.clear();
             ArtemisConsumer.IsInserted = true;
             ArtemisConsumer.t1 = new Timestamp(new Date().getTime());
+
+            boolean foundList = false;
+            // Get next list to work with
+            for (int i = 0; i < 10; i++){
+                if (ArtemisConsumer.freeLists.get(i)) {
+                    foundList = true;
+                    ArtemisConsumer.activeList = i;
+                    ArtemisConsumer.freeLists.set(i, false);
+                }
+            }
+            if(!foundList){
+                ArtemisConsumer.activeList = freeLists.size();
+                ArtemisConsumer.freeLists.add(ArtemisConsumer.activeList, true);
+                ArtemisConsumer.apiDumpEntityLists.add(ArtemisConsumer.activeList, new ArrayList<ApiDumpEntity>());
+                ArtemisConsumer.apiAuditEntityLists.add(ArtemisConsumer.activeList, new ArrayList<ApiAuditEntity>());
+            }
         }
     }
 
@@ -200,31 +226,19 @@ public class ArtemisConsumer  {
         return ArtemisConsumer.t1;
     }
 
-    public static void setT1(Timestamp t1) {
-        ArtemisConsumer.t1 = t1;
-    }
-
-    public static Timestamp getT2() {
-        return ArtemisConsumer.t2;
-    }
-
-    public static void setT2(Timestamp t2) {
-        ArtemisConsumer.t2 = t2;
-    }
-
     public static List<ApiAuditEntity> getApiAuditEntityList() {
-        return ArtemisConsumer.apiAuditEntityList;
-    }
-
-    public static void setApiAuditEntityList(List<ApiAuditEntity> apiAuditEntityList) {
-        ArtemisConsumer.apiAuditEntityList = apiAuditEntityList;
+        return ArtemisConsumer.apiAuditEntityLists.get(activeList);
     }
 
     public static List<ApiDumpEntity> getApiDumpEntityList() {
-        return ArtemisConsumer.apiDumpEntityList;
+        return ArtemisConsumer.apiDumpEntityLists.get(activeList);
     }
 
-    public static void setApiDumpEntityList(List<ApiDumpEntity> apiDumpEntityList) {
-        ArtemisConsumer.apiDumpEntityList = apiDumpEntityList;
+    public static void setFreeLists(int active) {
+        ArtemisConsumer.freeLists.set(active, true);
+    }
+
+    public static int getActiveList() {
+        return activeList;
     }
 }

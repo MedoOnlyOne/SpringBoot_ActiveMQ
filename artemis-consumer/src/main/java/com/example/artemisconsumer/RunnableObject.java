@@ -24,7 +24,7 @@ public class RunnableObject implements Runnable {
 	
 	private List<ApiDumpEntity> apiDumpEntityList ;
 	private List<ApiAuditEntity> apiAuditEntityList ;
-	
+	private int activeList;
 	
 	public RunnableObject() {}
 	public RunnableObject(
@@ -32,14 +32,16 @@ public class RunnableObject implements Runnable {
 			ApiDumpRepository apiDumpRepository,
 			ApiAuditRepository apiAuditRepository,
 			List<ApiDumpEntity> apiDumpEntityList,
-			List<ApiAuditEntity> apiAuditEntityList
+			List<ApiAuditEntity> apiAuditEntityList,
+			int activelist
 			)
 	{
 		this.insert = insert;
 		this.apiDumpRepository = apiDumpRepository;
 		this.apiAuditRepository = apiAuditRepository;
-		this.apiDumpEntityList = new ArrayList<>(apiDumpEntityList);
-		this.apiAuditEntityList = new ArrayList<>(apiAuditEntityList);
+		this.apiDumpEntityList = apiDumpEntityList;
+		this.apiAuditEntityList = apiAuditEntityList;
+		this.activeList = activelist;
 	}
 
 
@@ -47,5 +49,6 @@ public class RunnableObject implements Runnable {
 	public void run() {
 		// Save Audit message & dump
 		insert.insert(apiDumpRepository, apiAuditRepository, apiDumpEntityList, apiAuditEntityList);
+		ArtemisConsumer.setFreeLists(activeList);
 	}
 }
