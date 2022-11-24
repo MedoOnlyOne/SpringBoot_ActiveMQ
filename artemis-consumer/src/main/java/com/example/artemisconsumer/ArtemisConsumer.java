@@ -61,40 +61,40 @@ public class ArtemisConsumer  {
 
 //        System.out.print("XML MESSAGE"+msg);
         
+        XmlMapper xmlMapper = new XmlMapper();
+        
         String ReqId = "<ReqID>"+msg.split("<ReqID>")[1].split("</ReqID>")[0] + "</ReqID>";
         String ApiDetails =msg.split("<AuditRecord>")[1].split("</AuditRecord>")[0].split("<APIDetails>")[1].split("</APIDetails>")[0];
         String AuditVars = msg.split("<AuditRecord>")[1].split("</AuditRecord>")[0].split("<AuditVars>")[1].split("</AuditVars>")[0];
         
-       
-        String [] DumpRecords = msg.split("<DumpRecords>")[1].split("</DumpRecords>")[0].split("<Msg>");
-        String DumpRecord1 = "<Dump1>" + ReqId + DumpRecords[1].split("</Msg>")[0] + "</Dump1>";
-        String DumpRecord2 = "<Dump2>" + ReqId + DumpRecords[2].split("</Msg>")[0] + "</Dump2>";
-        String DumpRecord3 = "<Dump3>" + ReqId + DumpRecords[3].split("</Msg>")[0] + "</Dump3>";
-
-//        System.out.println("DumpRecord1"+DumpRecord1);
-//        System.out.println("DumpRecord2"+DumpRecord2);
-//        System.out.println("DumpRecord3"+DumpRecord3);
-        
-        
         String AuditEntity = "<Audit>" + ReqId + ApiDetails + AuditVars + "</Audit>";
-//        System.out.println("AuditEntity"+AuditEntity);
+      //Map Audit Entity
+        ApiAuditEntity ApiAuditEntity = xmlMapper.readValue(AuditEntity.getBytes(), ApiAuditEntity.class);
+        ArtemisConsumer.apiAuditEntityList.add(ApiAuditEntity);
+               
+       //Map Dump Records 
+        String [] DumpRecords = msg.split("<DumpRecords>")[1].split("</DumpRecords>")[0].split("<Msg>");
         
-        XmlMapper xmlMapper = new XmlMapper();
+        for (int i = 1; i < DumpRecords.length; i++) {
+        	String DumpRecord = "<Dump>" + ReqId + DumpRecords[i].split("</Msg>")[0] + "</Dump>";
+            ApiDumpEntity ApiDumpEntity =  xmlMapper.readValue(DumpRecord.getBytes(), ApiDumpEntity.class);
+          ArtemisConsumer.apiDumpEntityList.add(ApiDumpEntity);
+        }
+        
         //APILogEntry dumpAuditMsg = xmlMapper.readValue(msg.getBytes(), APILogEntry.class);
         
-        //Map Audit Entity
-        ApiAuditEntity ApiAuditEntity = xmlMapper.readValue(AuditEntity.getBytes(), ApiAuditEntity.class);
+        
 //        System.out.println("AuditEntityATTRIBUTE"+ApiAuditEntity.getaApiName());
         
-        ApiDumpEntity ApiDumpEntity1 =  xmlMapper.readValue(DumpRecord1.getBytes(), ApiDumpEntity.class);
-//        System.out.println("DumpEntityATTRIBUTE"+ApiAuditEntity1.getMdMsgTp());
-        ArtemisConsumer.apiDumpEntityList.add(ApiDumpEntity1);
-        
-        ApiDumpEntity ApiDumpEntity2 =  xmlMapper.readValue(DumpRecord2.getBytes(), ApiDumpEntity.class);     
-        ArtemisConsumer.apiDumpEntityList.add(ApiDumpEntity2);
-        
-        ApiDumpEntity ApiDumpEntity3 =  xmlMapper.readValue(DumpRecord3.getBytes(), ApiDumpEntity.class);     
-        ArtemisConsumer.apiDumpEntityList.add(ApiDumpEntity3);
+//        ApiDumpEntity ApiDumpEntity1 =  xmlMapper.readValue(DumpRecord1.getBytes(), ApiDumpEntity.class);
+////        System.out.println("DumpEntityATTRIBUTE"+ApiAuditEntity1.getMdMsgTp());
+//        ArtemisConsumer.apiDumpEntityList.add(ApiDumpEntity1);
+//        
+//        ApiDumpEntity ApiDumpEntity2 =  xmlMapper.readValue(DumpRecord2.getBytes(), ApiDumpEntity.class);     
+//        ArtemisConsumer.apiDumpEntityList.add(ApiDumpEntity2);
+//        
+//        ApiDumpEntity ApiDumpEntity3 =  xmlMapper.readValue(DumpRecord3.getBytes(), ApiDumpEntity.class);     
+//        ArtemisConsumer.apiDumpEntityList.add(ApiDumpEntity3);
         
 //        ObjectMapper mapper = new ObjectMapper();
 //        APILogEntry dumpAuditMsg = mapper.readValue(msg , APILogEntry.class );
@@ -166,7 +166,7 @@ public class ArtemisConsumer  {
 //                auditMsg.getAuditRecord().getAuditVars().getUsrDef14(),
 //                auditMsg.getAuditRecord().getAuditVars().getUsrDef15()
 //        );
-        ArtemisConsumer.apiAuditEntityList.add(ApiAuditEntity);
+       
   
         if (ArtemisConsumer.apiAuditEntityList.size() == batch_size) {
             ArtemisConsumer.t2 = new Timestamp(new Date().getTime());
