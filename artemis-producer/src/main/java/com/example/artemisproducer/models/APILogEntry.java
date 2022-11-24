@@ -13,10 +13,6 @@ public class APILogEntry implements Serializable {
      AuditRecord AuditRecord;
      @JacksonXmlProperty(isAttribute = true)
      DumpRecord DumpRecords;
-     @JacksonXmlProperty(isAttribute = true)
-     String json;
-     @JacksonXmlProperty(isAttribute = true)
-     String text;
 
      public String getReqID() {
           return ReqID;
@@ -42,30 +38,12 @@ public class APILogEntry implements Serializable {
           DumpRecords = dumpRecord;
      }
 
-     public String getJson() {
-          return json;
-     }
-
-     public void setJson(String json) {
-          this.json = json;
-     }
-
-     public String getText() {
-          return text;
-     }
-
-     public void setText(String text) {
-          this.text = text;
-     }
-
      @Override
      public String toString() {
           return "APILogEntry{" +
                   "ReqID='" + ReqID + '\'' +
                   ", AuditRecord=" + AuditRecord +
                   ", DumpRecords=" + DumpRecords +
-                  ", json='" + json + '\'' +
-                  ", text='" + text + '\'' +
                   '}';
      }
 }
