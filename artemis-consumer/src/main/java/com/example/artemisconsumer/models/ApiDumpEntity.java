@@ -20,13 +20,17 @@ public class ApiDumpEntity {
     @JacksonXmlProperty(isAttribute = true)
     private String ReqID;
     @Column(name = "md_api_name")
-    private String mdApiName;
+    @JacksonXmlProperty(isAttribute = true)
+    private String APIName;
     @Column(name = "md_api_root")
-    private String mdApiRoot;
+    @JacksonXmlProperty(isAttribute = true)
+    private String APIRoot;
     @Column(name = "md_operation_id")
-    private String mdOperationId;
+    @JacksonXmlProperty(isAttribute = true)
+    private String OperationID;
     @Column(name = "md_api_path")
-    private String mdApiPath;
+    @JacksonXmlProperty(isAttribute = true)
+    private String APIPath;
     @Column(name = "md_msg_tp")
     @JacksonXmlProperty(isAttribute = true)
     private String MsgType;
@@ -90,35 +94,35 @@ public class ApiDumpEntity {
     }
 
     public String getMdApiName() {
-        return mdApiName;
+        return APIName;
     }
 
     public void setMdApiName(String mdApiName) {
-        this.mdApiName = mdApiName;
+        this.APIName = mdApiName;
     }
 
     public String getMdApiRoot() {
-        return mdApiRoot;
+        return APIRoot;
     }
 
     public void setMdApiRoot(String mdApiRoot) {
-        this.mdApiRoot = mdApiRoot;
+        this.APIRoot = mdApiRoot;
     }
 
     public String getMdOperationId() {
-        return mdOperationId;
+        return OperationID;
     }
 
     public void setMdOperationId(String mdOperationId) {
-        this.mdOperationId = mdOperationId;
+        this.OperationID = mdOperationId;
     }
 
     public String getMdApiPath() {
-        return mdApiPath;
+        return APIPath;
     }
 
     public void setMdApiPath(String mdApiPath) {
-        this.mdApiPath = mdApiPath;
+        this.APIPath = mdApiPath;
     }
 
     public String getMdMsgTp() {

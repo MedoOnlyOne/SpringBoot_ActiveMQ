@@ -76,6 +76,11 @@ public class ArtemisConsumer  {
         String ApiDetails =msg.split("<AuditRecord>")[1].split("</AuditRecord>")[0].split("<APIDetails>")[1].split("</APIDetails>")[0];
         String AuditVars = msg.split("<AuditRecord>")[1].split("</AuditRecord>")[0].split("<AuditVars>")[1].split("</AuditVars>")[0];
         
+        String ApiName = "<APIName>" + ApiDetails.split("<APIName>")[1].split("</APIName>")[0] + "</APIName>";
+        String ApiDump =  ApiName + "<APIRoot>" + ApiDetails.split("<APIRoot>")[1].split("</APIPath>")[0]+"</APIPath>";
+        
+        //System.out.print(ApiDump);
+        
         String AuditEntity = "<Audit>" + ReqId + ApiDetails + AuditVars + "</Audit>";
       //Map Audit Entity
         ApiAuditEntity ApiAuditEntity = xmlMapper.readValue(AuditEntity.getBytes(), ApiAuditEntity.class);
@@ -85,7 +90,8 @@ public class ArtemisConsumer  {
         String [] DumpRecords = msg.split("<DumpRecords>")[1].split("</DumpRecords>")[0].split("<Msg>");
         
         for (int i = 1; i < DumpRecords.length; i++) {
-        	String DumpRecord = "<Dump>" + ReqId + DumpRecords[i].split("</Msg>")[0] + "</Dump>";
+        	String DumpRecord = "<Dump>" + ReqId + ApiDump +DumpRecords[i].split("</Msg>")[0] + "</Dump>";
+        	System.out.print(DumpRecord);
             ApiDumpEntity ApiDumpEntity =  xmlMapper.readValue(DumpRecord.getBytes(), ApiDumpEntity.class);
           ArtemisConsumer.apiDumpEntityLists.get(activeList).add(ApiDumpEntity);
         }
