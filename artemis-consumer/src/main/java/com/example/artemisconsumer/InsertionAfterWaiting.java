@@ -30,8 +30,8 @@ public class InsertionAfterWaiting implements Runnable{
     @Override
     public void run() {
         while(true) {
+            int activeList = ArtemisConsumer.getActiveList();
             Timestamp now = new Timestamp(new Date().getTime());
-
             if(!ArtemisConsumer.isInsert() &&
                     (now.getTime() - ArtemisConsumer.getT1().getTime()/1000) >= MAX_WAITING_TIME){
                 this.apiAuditEntityList = ArtemisConsumer.getApiAuditEntityList();
@@ -39,12 +39,11 @@ public class InsertionAfterWaiting implements Runnable{
 
                 System.out.println("Inserting " + this.apiAuditEntityList.size() + " after waiting");
 
-                ArtemisConsumer.setApiAuditEntityList(new ArrayList<ApiAuditEntity>());
-                ArtemisConsumer.setApiDumpEntityList(new ArrayList<ApiDumpEntity>());
                 ArtemisConsumer.setInsert(true);
                 System.out.println("The actual array has " + ArtemisConsumer.getApiDumpEntityList().size() + " element");
                 System.out.println("The actual flag is" + ArtemisConsumer.isInsert());
                 insert.insert(apiDumpRepository, apiAuditRepository, apiDumpEntityList, apiAuditEntityList);
+                ArtemisConsumer.setFreeLists(activeList);
             }
             try {
                 Thread.sleep(MAX_WAITING_TIME * 1000);
