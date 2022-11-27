@@ -79,7 +79,7 @@ const send = async () => {
      </DumpRecords>
     </APILogEntry>`
 
-    for(let i = 0; i < 10; i++) {
+    for(let i = 0; i < 500; i++) {
         await fetch(' http://localhost:8080/send', {
             method: 'POST',
             headers: {

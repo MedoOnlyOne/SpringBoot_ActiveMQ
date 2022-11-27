@@ -7,7 +7,6 @@ import com.example.artemisconsumer.repositpries.ApiDumpRepository;
 import com.example.artemisconsumer.services.Insert;
 
 import java.sql.Timestamp;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -30,20 +29,21 @@ public class InsertionAfterWaiting implements Runnable{
     @Override
     public void run() {
         while(true) {
-            int activeList = ArtemisConsumer.getActiveList();
             Timestamp now = new Timestamp(new Date().getTime());
             if(!ArtemisConsumer.isInsert() &&
                     (now.getTime() - ArtemisConsumer.getT1().getTime()/1000) >= MAX_WAITING_TIME){
-                this.apiAuditEntityList = ArtemisConsumer.getApiAuditEntityList();
-                this.apiDumpEntityList = ArtemisConsumer.getApiDumpEntityList();
+                if(ArtemisConsumer.getApiAuditEntityLists().peek() != null &&
+                        ArtemisConsumer.getApiDumpEntityLists().peek() != null){
+                    this.apiAuditEntityList = ArtemisConsumer.getApiAuditEntityLists().poll();
+                    this.apiDumpEntityList = ArtemisConsumer.getApiDumpEntityLists().poll();
+                }
 
                 System.out.println("Inserting " + this.apiAuditEntityList.size() + " after waiting");
 
                 ArtemisConsumer.setInsert(true);
-                System.out.println("The actual array has " + ArtemisConsumer.getApiDumpEntityList().size() + " element");
-                System.out.println("The actual flag is" + ArtemisConsumer.isInsert());
+                System.out.println("The actual flag is " + ArtemisConsumer.isInsert());
                 insert.insert(apiDumpRepository, apiAuditRepository, apiDumpEntityList, apiAuditEntityList);
-                ArtemisConsumer.setFreeLists(activeList);
+                ArtemisConsumer.setFreeLists(apiAuditEntityList, apiDumpEntityList);
             }
             try {
                 Thread.sleep(MAX_WAITING_TIME * 1000);
