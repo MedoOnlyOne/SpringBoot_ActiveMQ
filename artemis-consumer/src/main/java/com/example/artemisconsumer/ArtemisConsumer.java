@@ -5,6 +5,9 @@ import com.example.artemisconsumer.repositpries.ApiAuditRepository;
 import com.example.artemisconsumer.repositpries.ApiDumpRepository;
 import com.example.artemisconsumer.services.Insert;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jms.annotation.JmsListener;
 import org.springframework.stereotype.Component;
@@ -19,6 +22,7 @@ import java.sql.Timestamp;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
 
 @Component
 public class ArtemisConsumer  {
@@ -58,7 +62,7 @@ public class ArtemisConsumer  {
         }
     }
     @JmsListener(destination = "${jms.queue.destination}")
-    public void receive(String msg) throws IOException {
+    public void receive(String msg) throws IOException, DecoderException {
         if(ArtemisConsumer.apiAuditEntityLists.peek() != null){
             if(ArtemisConsumer.apiAuditEntityLists.peek().size() == 0){
                 ArtemisConsumer.t1 = new Timestamp(new Date().getTime());
@@ -128,7 +132,7 @@ public class ArtemisConsumer  {
         apiDumpEntityLists.add(apiDumpEntityList);
     }
 
-    private static void mapAndSaveMsg(String msg) throws IOException {
+    private static void mapAndSaveMsg(String msg) throws IOException , DecoderException{
         XmlMapper xmlMapper = new XmlMapper();
 
         String ReqId = "\n\t<ReqID>"+msg.split("<ReqID>")[1].split("</ReqID>")[0] + "</ReqID>";
@@ -159,6 +163,13 @@ public class ArtemisConsumer  {
             String DumpRecord = "<Dump>" + ReqId + "\n\t" + ApiDump +DumpRecords[i].split("</Msg>")[0] + "</Dump>\n\n";
         	//System.out.print(DumpRecord);
             ApiDumpEntity ApiDumpEntity = xmlMapper.readValue(DumpRecord.getBytes(), ApiDumpEntity.class);
+            
+            //	DECODING PAYLOAD
+            String HexPayload = ApiDumpEntity.getMdPayload();
+            byte[] bytes = Hex.decodeHex(HexPayload.toCharArray());            
+            ApiDumpEntity.setMdPayload(new String(bytes));
+            System.out.println(ApiDumpEntity.getMdPayload());
+            
             if(ArtemisConsumer.isListsAvailable){
                 ArtemisConsumer.apiDumpEntityLists.peek().add(ApiDumpEntity);
             } else {

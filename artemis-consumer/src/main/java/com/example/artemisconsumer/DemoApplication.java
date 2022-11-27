@@ -1,5 +1,4 @@
 package com.example.artemisconsumer;
-;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
