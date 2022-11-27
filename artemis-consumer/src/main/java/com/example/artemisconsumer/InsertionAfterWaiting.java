@@ -32,8 +32,7 @@ public class InsertionAfterWaiting implements Runnable{
             Timestamp now = new Timestamp(new Date().getTime());
             if(!ArtemisConsumer.isInsert() &&
                     (now.getTime() - ArtemisConsumer.getT1().getTime()/1000) >= MAX_WAITING_TIME){
-                if(ArtemisConsumer.getApiAuditEntityLists().peek() != null &&
-                        ArtemisConsumer.getApiDumpEntityLists().peek() != null){
+                if(ArtemisConsumer.isIsListsAvailable()){
                     this.apiAuditEntityList = ArtemisConsumer.getApiAuditEntityLists().poll();
                     this.apiDumpEntityList = ArtemisConsumer.getApiDumpEntityLists().poll();
                 }
