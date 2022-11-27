@@ -34,8 +34,8 @@ public class ArtemisConsumer  {
     @Autowired
     private Insert insert;
 
-    private static final int MAX_LISTS = 10;
-    private final int batch_size = 500;
+    private static final int MAX_LISTS = 1;
+    private final int batch_size = 5;
     private final int MAX_THREADS = 3;
 
     private static Queue<List<ApiAuditEntity>> apiAuditEntityLists = new LinkedList<>();
@@ -148,9 +148,9 @@ public class ArtemisConsumer  {
         //System.out.println(AuditEntity);
 
         //Map Audit Entity
-        ApiAuditEntity ApiAuditEntity = xmlMapper.readValue(AuditEntity.getBytes(), ApiAuditEntity.class);
+        ApiAuditEntity apiAuditEntity = xmlMapper.readValue(AuditEntity.getBytes(), ApiAuditEntity.class);
         if (ArtemisConsumer.isListsAvailable){
-            ArtemisConsumer.apiAuditEntityLists.peek().add(ApiAuditEntity);
+            ArtemisConsumer.apiAuditEntityLists.peek().add(apiAuditEntity);
         } else {
             // write to a file
             ArtemisConsumer.auditFileOutputStream.write(AuditEntity.getBytes(StandardCharsets.UTF_8));
@@ -162,23 +162,24 @@ public class ArtemisConsumer  {
         for (int i = 1; i < DumpRecords.length; i++) {
             String DumpRecord = "<Dump>" + ReqId + "\n\t" + ApiDump +DumpRecords[i].split("</Msg>")[0] + "</Dump>\n\n";
         	//System.out.print(DumpRecord);
-            ApiDumpEntity ApiDumpEntity = xmlMapper.readValue(DumpRecord.getBytes(), ApiDumpEntity.class);
-            
-            //	DECODING PAYLOAD
-            String HexPayload = ApiDumpEntity.getMdPayload();
-            byte[] bytes = Hex.decodeHex(HexPayload.toCharArray());            
-            ApiDumpEntity.setMdPayload(new String(bytes));
-            System.out.println(ApiDumpEntity.getMdPayload());
+            ApiDumpEntity apiDumpEntity = xmlMapper.readValue(DumpRecord.getBytes(), ApiDumpEntity.class);
+            decodePayload(apiDumpEntity);
+//            System.out.println(apiDumpEntity.getMdPayload());
             
             if(ArtemisConsumer.isListsAvailable){
-                ArtemisConsumer.apiDumpEntityLists.peek().add(ApiDumpEntity);
+                ArtemisConsumer.apiDumpEntityLists.peek().add(apiDumpEntity);
             } else {
                 // write to a file
                 ArtemisConsumer.dumpFileOutputStream.write(DumpRecord.getBytes(StandardCharsets.UTF_8));
             }
         }
     }
-
+    private static void decodePayload(ApiDumpEntity apiDumpEntity) throws DecoderException {
+        //	DECODING PAYLOAD
+        String HexPayload = apiDumpEntity.getMdPayload();
+        byte[] bytes = Hex.decodeHex(HexPayload.toCharArray());
+        apiDumpEntity.setMdPayload(new String(bytes));
+    }
     private static void writeToFiles() throws IOException {
         ArtemisConsumer.isListsAvailable = false;
         ArtemisConsumer.auditFileName = "Audit " + new Timestamp(new Date().getTime()).toString() + ".txt";
@@ -213,9 +214,10 @@ public class ArtemisConsumer  {
                 record += line;
                 if(line.contains("</Dump>")){
 //                    System.out.println("Dump record: " + record);
-                    ApiDumpEntity ApiDumpEntity = xmlMapper.readValue(record.getBytes(), ApiDumpEntity.class);
+                    ApiDumpEntity apiDumpEntity = xmlMapper.readValue(record.getBytes(), ApiDumpEntity.class);
+                    decodePayload(apiDumpEntity);
                     if(ArtemisConsumer.isListsAvailable){
-                        ArtemisConsumer.apiDumpEntityLists.peek().add(ApiDumpEntity);
+                        ArtemisConsumer.apiDumpEntityLists.peek().add(apiDumpEntity);
                     } else {
                         // write to a file
                         ArtemisConsumer.dumpFileOutputStream.write(record.getBytes(StandardCharsets.UTF_8));
@@ -228,9 +230,9 @@ public class ArtemisConsumer  {
                 record += line;
                 if(line.contains("</Audit>")){
 //                    System.out.println("Audit record: " + record);
-                    ApiAuditEntity ApiAuditEntity = xmlMapper.readValue(record.getBytes(), ApiAuditEntity.class);
+                    ApiAuditEntity apiAuditEntity = xmlMapper.readValue(record.getBytes(), ApiAuditEntity.class);
                     if (ArtemisConsumer.isListsAvailable){
-                        ArtemisConsumer.apiAuditEntityLists.peek().add(ApiAuditEntity);
+                        ArtemisConsumer.apiAuditEntityLists.peek().add(apiAuditEntity);
                     } else {
                         // write to a file
                         ArtemisConsumer.auditFileOutputStream.write(record.getBytes(StandardCharsets.UTF_8));
@@ -238,7 +240,7 @@ public class ArtemisConsumer  {
                     record = "";
                 }
             }
-        } catch (IOException e) {
+        } catch (IOException | DecoderException e) {
             e.printStackTrace();
         }
         ArtemisConsumer.dumpFileOutputStream.close();
