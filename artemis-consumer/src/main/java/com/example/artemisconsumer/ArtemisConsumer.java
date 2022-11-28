@@ -36,7 +36,7 @@ public class ArtemisConsumer  {
     @Autowired
     private Insert insert;
 
-    private static final int MAX_LISTS = 1;
+    private static final int MAX_LISTS = 3;
     private final int batch_size = 5;
     private final int MAX_THREADS = 3;
 
@@ -45,6 +45,8 @@ public class ArtemisConsumer  {
     private static boolean isListsAvailable;
     private static String auditFileName;
     private static String dumpFileName;
+    private static String dumpFileUnderProcessing;
+    private static String auditFileUnderProcessing;
     public static File auditFile;
     public static File dumpFile;
     private static FileOutputStream auditFileOutputStream;
@@ -74,7 +76,7 @@ public class ArtemisConsumer  {
             }
             if(!ArtemisConsumer.isListsAvailable){
                 // Save file content to DB
-                ArtemisConsumer.saveFiles();
+                saveFiles();
             }
         } else {
             if(ArtemisConsumer.isListsAvailable){
@@ -87,12 +89,13 @@ public class ArtemisConsumer  {
         //System.out.print("XML MESSAGE " + msg);
         ArtemisConsumer.mapAndSaveMsg(msg,messageId);
 
-        if (ArtemisConsumer.isListsAvailable && ArtemisConsumer.apiAuditEntityLists.peek().size() == batch_size) {
+        if (ArtemisConsumer.isListsAvailable && ArtemisConsumer.apiAuditEntityLists.peek().size() >= batch_size) {
             ArtemisConsumer.t2 = new Timestamp(new Date().getTime());
             System.out.println("start reading "+ t1);
             System.out.println("end reading " +  t2);
             System.out.println("Read " + batch_size + " messages in " + (t2.getTime() - t1.getTime())/1000.0 + " s");
-        	RunnableObject taskThread=new RunnableObject(insert,
+            System.out.println("List number: " + (MAX_LISTS - ArtemisConsumer.apiDumpEntityLists.size()));
+            RunnableObject taskThread=new RunnableObject(insert,
                      apiDumpRepository,
                      apiAuditRepository,
                      ArtemisConsumer.apiDumpEntityLists.poll(),
@@ -128,8 +131,40 @@ public class ArtemisConsumer  {
         return isListsAvailable;
     }
 
+    public static String getDumpFileUnderProcessing() {
+        return dumpFileUnderProcessing;
+    }
+
+    public static void setDumpFileUnderProcessing(String dumpFileUnderProcessing) {
+        ArtemisConsumer.dumpFileUnderProcessing = dumpFileUnderProcessing;
+    }
+
+    public static String getAuditFileUnderProcessing() {
+        return auditFileUnderProcessing;
+    }
+
+    public static void setAuditFileUnderProcessing(String auditFileUnderProcessing) {
+        ArtemisConsumer.auditFileUnderProcessing = auditFileUnderProcessing;
+    }
+
     public static void setIsListsAvailable(boolean isListsAvailable) {
         ArtemisConsumer.isListsAvailable = isListsAvailable;
+    }
+
+    public static String getAuditFileName() {
+        return auditFileName;
+    }
+
+    public static void setAuditFileName(String auditFileName) {
+        ArtemisConsumer.auditFileName = auditFileName;
+    }
+
+    public static String getDumpFileName() {
+        return dumpFileName;
+    }
+
+    public static void setDumpFileName(String dumpFileName) {
+        ArtemisConsumer.dumpFileName = dumpFileName;
     }
 
     public static void setFreeLists(List<ApiAuditEntity> apiAuditEntityList, List<ApiDumpEntity> apiDumpEntityList) {
@@ -143,7 +178,7 @@ public class ArtemisConsumer  {
         XmlMapper xmlMapper = new XmlMapper();
 
         String MsgId = "<MsgId>" + messageId.split("ID:")[1] + "</MsgId>";
-        System.out.println(MsgId);
+//        System.out.println(MsgId);
         String ReqId = "\n\t<ReqID>"+msg.split("<ReqID>")[1].split("</ReqID>")[0] + "</ReqID>";
         String ApiDetails =msg.split("<AuditRecord>")[1].split("</AuditRecord>")[0].split("<APIDetails>")[1].split("</APIDetails>")[0];
         String AuditVars = msg.split("<AuditRecord>")[1].split("</AuditRecord>")[0].split("<AuditVars>")[1].split("</AuditVars>")[0];
@@ -203,54 +238,70 @@ public class ArtemisConsumer  {
         ArtemisConsumer.dumpFileOutputStream = new FileOutputStream(ArtemisConsumer.dumpFile);
     }
 
-    private static void saveFiles() throws IOException {
+    private void saveFiles() throws IOException {
         ArtemisConsumer.isListsAvailable = true;
-        XmlMapper xmlMapper = new XmlMapper();
-
         System.out.println("Save files");
+        List<ApiDumpEntity> apiDumpList = saveDumpFiles(ArtemisConsumer.dumpFileName, ArtemisConsumer.apiDumpEntityLists.poll());
+        List<ApiAuditEntity> apiAuditList = saveAuditFiles(ArtemisConsumer.auditFileName, ArtemisConsumer.apiAuditEntityLists.poll());
+        insert.insert(apiDumpRepository, apiAuditRepository, apiDumpList, apiAuditList);
+        ArtemisConsumer.setFreeLists(apiAuditList, apiDumpList);
+        ArtemisConsumer.dumpFileOutputStream.close();
+        ArtemisConsumer.auditFileOutputStream.close();
+        ArtemisConsumer.dumpFile.delete();
+        ArtemisConsumer.auditFile.delete();
+    }
 
+    public static List<ApiDumpEntity> saveDumpFiles(String dumpFileName, List<ApiDumpEntity> apiDumpList){
+        XmlMapper xmlMapper = new XmlMapper();
         String record = "";
         try {
-            List<String> dumpLines = Files.readAllLines(Paths.get(ArtemisConsumer.dumpFileName));
-            List<String> auditLines = Files.readAllLines(Paths.get(ArtemisConsumer.auditFileName));
-//            List<String> dumpLines = Files.readAllLines(Paths.get("Dump 2022-11-27 14-50-55.693.txt"));
-//            List<String> auditLines = Files.readAllLines(Paths.get("Audit 2022-11-27 14-50-55.692.txt"));
-            System.out.println("Dump " + dumpLines.size());
-            System.out.println("Audit " + auditLines.size());
-            for (String line : dumpLines) {
-                record += line;
-                if(line.contains("</Dump>")){
-//                    System.out.println("Dump record: " + record);
-                    ApiDumpEntity apiDumpEntity = xmlMapper.readValue(record.getBytes(), ApiDumpEntity.class);
-                    decodePayload(apiDumpEntity);
-                    if(ArtemisConsumer.isListsAvailable){
-                        ArtemisConsumer.apiDumpEntityLists.peek().add(apiDumpEntity);
-                    } else {
-                        // write to a file
-                        ArtemisConsumer.dumpFileOutputStream.write(record.getBytes(StandardCharsets.UTF_8));
-                    }
-                    record = "";
-                }
-            }
+            if (!dumpFileName.equals(ArtemisConsumer.dumpFileUnderProcessing)){
+                ArtemisConsumer.dumpFileUnderProcessing = dumpFileName;
+                List<String> dumpLines = Files.readAllLines(Paths.get(dumpFileName));
+                System.out.println("Dump " + dumpLines.size());
+                for (String line : dumpLines) {
+                    record += line;
+                    if(line.contains("</Dump>")){
+    //                    System.out.println("Dump record: " + record);
+                        ApiDumpEntity apiDumpEntity = xmlMapper.readValue(record.getBytes(), ApiDumpEntity.class);
+                        decodePayload(apiDumpEntity);
+                        apiDumpList.add(apiDumpEntity);
 
-            for (String line : auditLines) {
-                record += line;
-                if(line.contains("</Audit>")){
-//                    System.out.println("Audit record: " + record);
-                    ApiAuditEntity apiAuditEntity = xmlMapper.readValue(record.getBytes(), ApiAuditEntity.class);
-                    if (ArtemisConsumer.isListsAvailable){
-                        ArtemisConsumer.apiAuditEntityLists.peek().add(apiAuditEntity);
-                    } else {
-                        // write to a file
-                        ArtemisConsumer.auditFileOutputStream.write(record.getBytes(StandardCharsets.UTF_8));
+                        record = "";
                     }
-                    record = "";
                 }
+                ArtemisConsumer.dumpFileUnderProcessing = "";
             }
         } catch (IOException | DecoderException e) {
             e.printStackTrace();
         }
-        ArtemisConsumer.dumpFileOutputStream.close();
-        ArtemisConsumer.auditFileOutputStream.close();
+            return apiDumpList;
+    }
+
+    public static List<ApiAuditEntity> saveAuditFiles(String auditFileName, List<ApiAuditEntity> apiAuditList){
+        XmlMapper xmlMapper = new XmlMapper();
+        String record = "";
+        try {
+            if (!auditFileName.equals(ArtemisConsumer.auditFileUnderProcessing)){
+                ArtemisConsumer.auditFileUnderProcessing = auditFileName;
+                List<String> auditLines = Files.readAllLines(Paths.get(auditFileName));
+                System.out.println("Audit " + auditLines.size());
+
+                for (String line : auditLines) {
+                    record += line;
+                    if(line.contains("</Audit>")){
+    //                    System.out.println("Audit record: " + record);
+                        ApiAuditEntity apiAuditEntity = xmlMapper.readValue(record.getBytes(), ApiAuditEntity.class);
+                        apiAuditList.add(apiAuditEntity);
+
+                        record = "";
+                    }
+                }
+                ArtemisConsumer.auditFileUnderProcessing = "";
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+            return apiAuditList;
     }
 }
