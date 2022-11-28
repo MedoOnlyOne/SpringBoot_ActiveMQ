@@ -15,7 +15,8 @@ public class ApiDumpEntity {
     @Column(name = "md_id")
     private int mdId;
     @Column(name = "md_msg_id")
-    private String mdMsgId;
+    @JacksonXmlProperty(isAttribute = true)
+    private String MsgId;
     @Column(name = "md_req_id")
     @JacksonXmlProperty(isAttribute = true)
     private String ReqID;
@@ -78,11 +79,11 @@ public class ApiDumpEntity {
     }
 
     public String getMdMsgId() {
-        return mdMsgId;
+        return MsgId;
     }
 
     public void setMdMsgId(String mdMsgId) {
-        this.mdMsgId = mdMsgId;
+        this.MsgId = mdMsgId;
     }
 
     public String getMdReqId() {

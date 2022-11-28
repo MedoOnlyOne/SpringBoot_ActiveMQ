@@ -16,7 +16,8 @@ public class ApiAuditEntity implements Serializable{
     @Column(name = "a_id")
     private int aId;
     @Column(name = "a_msg_id")
-    private String aMsgId;
+    @JacksonXmlProperty(isAttribute = true)
+    private String MsgId;
     @Column(name = "a_req_id")
     @JacksonXmlProperty(isAttribute = true)
     private String ReqID;
@@ -180,11 +181,11 @@ public class ApiAuditEntity implements Serializable{
     }
 
     public String getaMsgId() {
-        return aMsgId;
+        return MsgId;
     }
 
     public void setaMsgId(String aMsgId) {
-        this.aMsgId = aMsgId;
+        this.MsgId = aMsgId;
     }
 
     public String getaReqId() {

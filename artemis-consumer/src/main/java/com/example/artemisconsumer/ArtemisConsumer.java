@@ -10,6 +10,8 @@ import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jms.annotation.JmsListener;
+import org.springframework.jms.support.JmsHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -61,8 +63,10 @@ public class ArtemisConsumer  {
             apiDumpEntityLists.add(new ArrayList<ApiDumpEntity>());
         }
     }
-    @JmsListener(destination = "${jms.queue.destination}")
-    public void receive(String msg) throws IOException, DecoderException {
+    @JmsListener(destination = "${jms.queue.destination}" )
+    public void receive(String msg , @Header(JmsHeaders.MESSAGE_ID) String messageId 
+    		//@Header("CodedCharSetId") int CodedCharSetId , @Header("Encoding") int Encoding    		
+    		) throws IOException, DecoderException {
         if(ArtemisConsumer.apiAuditEntityLists.peek() != null){
             if(ArtemisConsumer.apiAuditEntityLists.peek().size() == 0){
                 ArtemisConsumer.t1 = new Timestamp(new Date().getTime());
@@ -77,8 +81,11 @@ public class ArtemisConsumer  {
                 ArtemisConsumer.writeToFiles();
             }
         }
+        //System.out.println( messageId);
+        //System.out.println( CodedCharSetId);
+        //System.out.println( Encoding);
         //System.out.print("XML MESSAGE " + msg);
-        ArtemisConsumer.mapAndSaveMsg(msg);
+        ArtemisConsumer.mapAndSaveMsg(msg,messageId);
 
         if (ArtemisConsumer.isListsAvailable && ArtemisConsumer.apiAuditEntityLists.peek().size() == batch_size) {
             ArtemisConsumer.t2 = new Timestamp(new Date().getTime());
@@ -132,20 +139,20 @@ public class ArtemisConsumer  {
         apiDumpEntityLists.add(apiDumpEntityList);
     }
 
-    private static void mapAndSaveMsg(String msg) throws IOException , DecoderException{
+    private static void mapAndSaveMsg(String msg , String messageId) throws IOException , DecoderException{
         XmlMapper xmlMapper = new XmlMapper();
 
+        String MsgId = "<MsgId>" + messageId.split("ID:")[1] + "</MsgId>";
+        System.out.println(MsgId);
         String ReqId = "\n\t<ReqID>"+msg.split("<ReqID>")[1].split("</ReqID>")[0] + "</ReqID>";
         String ApiDetails =msg.split("<AuditRecord>")[1].split("</AuditRecord>")[0].split("<APIDetails>")[1].split("</APIDetails>")[0];
         String AuditVars = msg.split("<AuditRecord>")[1].split("</AuditRecord>")[0].split("<AuditVars>")[1].split("</AuditVars>")[0];
 
         String ApiName = "<APIName>" + ApiDetails.split("<APIName>")[1].split("</APIName>")[0] + "</APIName>";
         String ApiDump =  ApiName + "<APIRoot>" + ApiDetails.split("<APIRoot>")[1].split("</APIPath>")[0]+"</APIPath>";
-
-        //System.out.println(ApiDump);
-
-        String AuditEntity = "<Audit>" + ReqId + ApiDetails + AuditVars + "</Audit>\n\n";
-        //System.out.println(AuditEntity);
+   
+        String AuditEntity = "<Audit>" + MsgId + ReqId + ApiDetails + AuditVars + "</Audit>\n\n";
+       
 
         //Map Audit Entity
         ApiAuditEntity apiAuditEntity = xmlMapper.readValue(AuditEntity.getBytes(), ApiAuditEntity.class);
@@ -160,7 +167,7 @@ public class ArtemisConsumer  {
         String [] DumpRecords = msg.split("<DumpRecords>")[1].split("</DumpRecords>")[0].split("<Msg>");
 
         for (int i = 1; i < DumpRecords.length; i++) {
-            String DumpRecord = "<Dump>" + ReqId + "\n\t" + ApiDump +DumpRecords[i].split("</Msg>")[0] + "</Dump>\n\n";
+            String DumpRecord = "<Dump>" + MsgId + ReqId + "\n\t" + ApiDump +DumpRecords[i].split("</Msg>")[0] + "</Dump>\n\n";
         	//System.out.print(DumpRecord);
             ApiDumpEntity apiDumpEntity = xmlMapper.readValue(DumpRecord.getBytes(), ApiDumpEntity.class);
             decodePayload(apiDumpEntity);
