@@ -37,12 +37,14 @@ public class ArtemisConsumer  {
     private Insert insert;
 
     private static final int MAX_LISTS = 3;
-    private final int batch_size = 5;
-    private final int MAX_THREADS = 3;
+    private final int batch_size = 100;
+    private final int MAX_THREADS = 2;
 
     private static Queue<List<ApiAuditEntity>> apiAuditEntityLists = new LinkedList<>();
     private static Queue<List<ApiDumpEntity>> apiDumpEntityLists = new LinkedList<>();
-    private static boolean isListsAvailable;
+    private static List<ApiAuditEntity> activeApiAuditList;
+    private static List<ApiDumpEntity> activeApiDumpList;
+    private static boolean isWriteToFiles;
     private static String auditFileName;
     private static String dumpFileName;
     private static String dumpFileUnderProcessing;
@@ -59,51 +61,50 @@ public class ArtemisConsumer  {
     static {
         ArtemisConsumer.t1 = new Timestamp(new Date().getTime());
         ArtemisConsumer.isInserted = true;
-        ArtemisConsumer.isListsAvailable = true;
+        ArtemisConsumer.isWriteToFiles = false;
         for (int i = 0; i < MAX_LISTS; i++){
-            apiAuditEntityLists.add(new ArrayList<ApiAuditEntity>());
-            apiDumpEntityLists.add(new ArrayList<ApiDumpEntity>());
+            apiAuditEntityLists.add(new ArrayList<>());
+            apiDumpEntityLists.add(new ArrayList<>());
         }
+        activeApiAuditList = apiAuditEntityLists.poll();
+        activeApiDumpList = apiDumpEntityLists.poll();
     }
     @JmsListener(destination = "${jms.queue.destination}" )
     public void receive(String msg , @Header(JmsHeaders.MESSAGE_ID) String messageId 
     		//@Header("CodedCharSetId") int CodedCharSetId , @Header("Encoding") int Encoding    		
     		) throws IOException, DecoderException {
-        if(ArtemisConsumer.apiAuditEntityLists.peek() != null){
-            if(ArtemisConsumer.apiAuditEntityLists.peek().size() == 0){
-                ArtemisConsumer.t1 = new Timestamp(new Date().getTime());
-                ArtemisConsumer.isInserted = false;
-            }
-            if(!ArtemisConsumer.isListsAvailable){
-                // Save file content to DB
-                saveFiles();
-            }
-        } else {
-            if(ArtemisConsumer.isListsAvailable){
-                ArtemisConsumer.writeToFiles();
+        if(activeApiDumpList != null && activeApiAuditList != null && activeApiAuditList.size() == 0){
+            ArtemisConsumer.t1 = new Timestamp(new Date().getTime());
+            ArtemisConsumer.isInserted = false;
+        } else if(!ArtemisConsumer.isListsAvailable() && activeApiDumpList == null && activeApiAuditList == null
+                && !isWriteToFiles){
+            ArtemisConsumer.writeToFiles();
+        } else if(ArtemisConsumer.isListsAvailable() && activeApiDumpList == null && activeApiAuditList == null){
+            activeApiDumpList = apiDumpEntityLists.poll();
+            activeApiAuditList = apiAuditEntityLists.poll();
+            if (isWriteToFiles){
+                ArtemisConsumer.saveFiles();
             }
         }
-        //System.out.println( messageId);
-        //System.out.println( CodedCharSetId);
-        //System.out.println( Encoding);
-        //System.out.print("XML MESSAGE " + msg);
-        ArtemisConsumer.mapAndSaveMsg(msg,messageId);
 
-        if (ArtemisConsumer.isListsAvailable && ArtemisConsumer.apiAuditEntityLists.peek().size() >= batch_size) {
+        ArtemisConsumer.mapAndSaveMsg(msg,messageId, activeApiAuditList, activeApiDumpList);
+
+        if(activeApiAuditList != null && activeApiDumpList != null && activeApiAuditList.size() >= batch_size){
             ArtemisConsumer.t2 = new Timestamp(new Date().getTime());
             System.out.println("start reading "+ t1);
             System.out.println("end reading " +  t2);
             System.out.println("Read " + batch_size + " messages in " + (t2.getTime() - t1.getTime())/1000.0 + " s");
             System.out.println("List number: " + (MAX_LISTS - ArtemisConsumer.apiDumpEntityLists.size()));
             RunnableObject taskThread=new RunnableObject(insert,
-                     apiDumpRepository,
-                     apiAuditRepository,
-                     ArtemisConsumer.apiDumpEntityLists.poll(),
-                     ArtemisConsumer.apiAuditEntityLists.poll()
+                    apiDumpRepository,
+                    apiAuditRepository,
+                    activeApiDumpList,
+                    activeApiAuditList
             );
             executor.execute(taskThread);
             ArtemisConsumer.isInserted = true;
-            ArtemisConsumer.t1 = new Timestamp(new Date().getTime());
+            activeApiAuditList = apiAuditEntityLists.poll();
+            activeApiDumpList = apiDumpEntityLists.poll();
         }
     }
 
@@ -127,44 +128,36 @@ public class ArtemisConsumer  {
         return apiDumpEntityLists;
     }
 
-    public static boolean isIsListsAvailable() {
-        return isListsAvailable;
+    public static boolean isListsAvailable() {
+        return ((ArtemisConsumer.apiAuditEntityLists.size() > 0) && (ArtemisConsumer.apiDumpEntityLists.size() > 0));
     }
 
-    public static String getDumpFileUnderProcessing() {
-        return dumpFileUnderProcessing;
+    public static boolean getIsWriteToFiles() {
+        return isWriteToFiles;
     }
 
-    public static void setDumpFileUnderProcessing(String dumpFileUnderProcessing) {
-        ArtemisConsumer.dumpFileUnderProcessing = dumpFileUnderProcessing;
+    public static void setIsWriteToFiles(boolean isWriteToFiles) {
+        ArtemisConsumer.isWriteToFiles = isWriteToFiles;
     }
 
-    public static String getAuditFileUnderProcessing() {
-        return auditFileUnderProcessing;
+    public static List<ApiAuditEntity> getActiveApiAuditList() {
+        List<ApiAuditEntity> returnedList = activeApiAuditList;
+        activeApiAuditList  = null;
+        return returnedList;
     }
 
-    public static void setAuditFileUnderProcessing(String auditFileUnderProcessing) {
-        ArtemisConsumer.auditFileUnderProcessing = auditFileUnderProcessing;
+    public static List<ApiDumpEntity> getActiveApiDumpList() {
+        List<ApiDumpEntity> returnedList = activeApiDumpList;
+        activeApiDumpList  = null;
+        return returnedList;
     }
 
-    public static void setIsListsAvailable(boolean isListsAvailable) {
-        ArtemisConsumer.isListsAvailable = isListsAvailable;
+    public static FileOutputStream getAuditFileOutputStream() {
+        return auditFileOutputStream;
     }
 
-    public static String getAuditFileName() {
-        return auditFileName;
-    }
-
-    public static void setAuditFileName(String auditFileName) {
-        ArtemisConsumer.auditFileName = auditFileName;
-    }
-
-    public static String getDumpFileName() {
-        return dumpFileName;
-    }
-
-    public static void setDumpFileName(String dumpFileName) {
-        ArtemisConsumer.dumpFileName = dumpFileName;
+    public static FileOutputStream getDumpFileOutputStream() {
+        return dumpFileOutputStream;
     }
 
     public static void setFreeLists(List<ApiAuditEntity> apiAuditEntityList, List<ApiDumpEntity> apiDumpEntityList) {
@@ -174,7 +167,12 @@ public class ArtemisConsumer  {
         apiDumpEntityLists.add(apiDumpEntityList);
     }
 
-    private static void mapAndSaveMsg(String msg , String messageId) throws IOException , DecoderException{
+    private static void mapAndSaveMsg(String msg,
+                                      String messageId,
+                                      List<ApiAuditEntity> auditList,
+                                      List<ApiDumpEntity> dumpList)
+            throws IOException , DecoderException{
+
         XmlMapper xmlMapper = new XmlMapper();
 
         String MsgId = "<MsgId>" + messageId.split("ID:")[1] + "</MsgId>";
@@ -185,14 +183,14 @@ public class ArtemisConsumer  {
 
         String ApiName = "<APIName>" + ApiDetails.split("<APIName>")[1].split("</APIName>")[0] + "</APIName>";
         String ApiDump =  ApiName + "<APIRoot>" + ApiDetails.split("<APIRoot>")[1].split("</APIPath>")[0]+"</APIPath>";
-   
+
         String AuditEntity = "<Audit>" + MsgId + ReqId + ApiDetails + AuditVars + "</Audit>\n\n";
-       
+
 
         //Map Audit Entity
         ApiAuditEntity apiAuditEntity = xmlMapper.readValue(AuditEntity.getBytes(), ApiAuditEntity.class);
-        if (ArtemisConsumer.isListsAvailable){
-            ArtemisConsumer.apiAuditEntityLists.peek().add(apiAuditEntity);
+        if (!ArtemisConsumer.isWriteToFiles){
+            auditList.add(apiAuditEntity);
         } else {
             // write to a file
             ArtemisConsumer.auditFileOutputStream.write(AuditEntity.getBytes(StandardCharsets.UTF_8));
@@ -208,8 +206,8 @@ public class ArtemisConsumer  {
             decodePayload(apiDumpEntity);
 //            System.out.println(apiDumpEntity.getMdPayload());
             
-            if(ArtemisConsumer.isListsAvailable){
-                ArtemisConsumer.apiDumpEntityLists.peek().add(apiDumpEntity);
+            if(!ArtemisConsumer.isWriteToFiles){
+                dumpList.add(apiDumpEntity);
             } else {
                 // write to a file
                 ArtemisConsumer.dumpFileOutputStream.write(DumpRecord.getBytes(StandardCharsets.UTF_8));
@@ -223,9 +221,9 @@ public class ArtemisConsumer  {
         apiDumpEntity.setMdPayload(new String(bytes));
     }
     private static void writeToFiles() throws IOException {
-        ArtemisConsumer.isListsAvailable = false;
-        ArtemisConsumer.auditFileName = "Audit " + new Timestamp(new Date().getTime()).toString() + ".txt";
-        ArtemisConsumer.dumpFileName = "Dump " + new Timestamp(new Date().getTime()).toString() + ".txt";
+        ArtemisConsumer.isWriteToFiles = true;
+        ArtemisConsumer.auditFileName = "Audit " + new Timestamp(new Date().getTime()).toString() + ".txt ...................";
+        ArtemisConsumer.dumpFileName = "Dump " + new Timestamp(new Date().getTime()).toString() + ".txt .....................";
         ArtemisConsumer.auditFileName = ArtemisConsumer.auditFileName.replaceAll(":", "-");
         ArtemisConsumer.dumpFileName = ArtemisConsumer.dumpFileName.replaceAll(":", "-");
         System.out.println(ArtemisConsumer.auditFileName);
@@ -238,27 +236,24 @@ public class ArtemisConsumer  {
         ArtemisConsumer.dumpFileOutputStream = new FileOutputStream(ArtemisConsumer.dumpFile);
     }
 
-    private void saveFiles() throws IOException {
-        ArtemisConsumer.isListsAvailable = true;
-        System.out.println("Save files");
-        List<ApiDumpEntity> apiDumpList = saveDumpFiles(ArtemisConsumer.dumpFileName, ArtemisConsumer.apiDumpEntityLists.poll());
-        List<ApiAuditEntity> apiAuditList = saveAuditFiles(ArtemisConsumer.auditFileName, ArtemisConsumer.apiAuditEntityLists.poll());
-        insert.insert(apiDumpRepository, apiAuditRepository, apiDumpList, apiAuditList);
-        ArtemisConsumer.setFreeLists(apiAuditList, apiDumpList);
+    private static void saveFiles() throws IOException {
+        ArtemisConsumer.isWriteToFiles = false;
         ArtemisConsumer.dumpFileOutputStream.close();
         ArtemisConsumer.auditFileOutputStream.close();
+        System.out.println("Save files......................");
+        saveDumpFiles(ArtemisConsumer.dumpFileName, activeApiDumpList);
+        saveAuditFiles(ArtemisConsumer.auditFileName, activeApiAuditList);
         ArtemisConsumer.dumpFile.delete();
         ArtemisConsumer.auditFile.delete();
     }
 
-    public static List<ApiDumpEntity> saveDumpFiles(String dumpFileName, List<ApiDumpEntity> apiDumpList){
+    public static void saveDumpFiles(String dumpFileName, List<ApiDumpEntity> apiDumpList){
         XmlMapper xmlMapper = new XmlMapper();
         String record = "";
         try {
             if (!dumpFileName.equals(ArtemisConsumer.dumpFileUnderProcessing)){
                 ArtemisConsumer.dumpFileUnderProcessing = dumpFileName;
                 List<String> dumpLines = Files.readAllLines(Paths.get(dumpFileName));
-                System.out.println("Dump " + dumpLines.size());
                 for (String line : dumpLines) {
                     record += line;
                     if(line.contains("</Dump>")){
@@ -266,7 +261,6 @@ public class ArtemisConsumer  {
                         ApiDumpEntity apiDumpEntity = xmlMapper.readValue(record.getBytes(), ApiDumpEntity.class);
                         decodePayload(apiDumpEntity);
                         apiDumpList.add(apiDumpEntity);
-
                         record = "";
                     }
                 }
@@ -275,25 +269,22 @@ public class ArtemisConsumer  {
         } catch (IOException | DecoderException e) {
             e.printStackTrace();
         }
-            return apiDumpList;
+        System.out.println("Dump file has " + apiDumpList.size() + " records ................");
     }
 
-    public static List<ApiAuditEntity> saveAuditFiles(String auditFileName, List<ApiAuditEntity> apiAuditList){
+    public static void saveAuditFiles(String auditFileName, List<ApiAuditEntity> apiAuditList){
         XmlMapper xmlMapper = new XmlMapper();
         String record = "";
         try {
             if (!auditFileName.equals(ArtemisConsumer.auditFileUnderProcessing)){
                 ArtemisConsumer.auditFileUnderProcessing = auditFileName;
                 List<String> auditLines = Files.readAllLines(Paths.get(auditFileName));
-                System.out.println("Audit " + auditLines.size());
-
                 for (String line : auditLines) {
                     record += line;
                     if(line.contains("</Audit>")){
     //                    System.out.println("Audit record: " + record);
                         ApiAuditEntity apiAuditEntity = xmlMapper.readValue(record.getBytes(), ApiAuditEntity.class);
                         apiAuditList.add(apiAuditEntity);
-
                         record = "";
                     }
                 }
@@ -302,6 +293,6 @@ public class ArtemisConsumer  {
         } catch (IOException e) {
             e.printStackTrace();
         }
-            return apiAuditList;
+        System.out.println("Audit file has " + apiAuditList.size() + " records ..............");
     }
 }
