@@ -5,12 +5,15 @@ import java.util.concurrent.Executors;
 import com.example.artemisconsumer.repositpries.ApiAuditRepository;
 import com.example.artemisconsumer.repositpries.ApiDumpRepository;
 import com.example.artemisconsumer.services.Insert;
+import com.example.artemisconsumer.services.InsertionAfterWaiting;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.jms.annotation.EnableJms;
 
 @SpringBootApplication
+@EnableJms
 public class DemoApplication implements CommandLineRunner {
 	@Autowired
 	Insert insert;

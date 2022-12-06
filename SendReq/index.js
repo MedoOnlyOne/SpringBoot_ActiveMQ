@@ -5,7 +5,7 @@ const send = async () => {
 
     const body = `<?xml version="1.0" encoding="UTF-8"?>
     <APILogEntry xmlns:json="http://www.ibm.com/xmlns/prod/2009/jsonx">
-     <ReqID>Test006</ReqID>
+     <ReqID>Test110</ReqID>
      <AuditRecord>
       <APIDetails>
        <APIName>accounts-links</APIName>
@@ -79,7 +79,7 @@ const send = async () => {
      </DumpRecords>
     </APILogEntry>`
 
-    for(let i = 0; i < 450; i++) {
+    for(let i = 0; i < 45000; i++) {
         await fetch(' http://localhost:8080/send', {
             method: 'POST',
             headers: {
